@@ -16,8 +16,11 @@ TVB Opportunity Intelligence continuously monitors, indexes, and evaluates publi
 ### 1. Multi-Source Global & Indian Discovery Engine
 Aggregates live opportunities through hardened, same-origin server bridges without exposing browser clients to external rate limits or CORS restrictions:
 
-* **United States & International Funding:**
+* **United States & Global Multilateral:**
   * **Grants.gov:** US Federal innovation grants (SBIR/STTR, NIH, NSF, DoD, DoE).
+  * **SAM.gov:** System for Award Management Federal Procurement RFPs, solicitations, and commercial IT task orders (NAICS 541511 / 541512).
+  * **SBIR.gov:** Small Business Innovation Research solicitations across DARPA, NASA, NSF, NIH, and DoE with non-dilutive commercialization funding.
+  * **Challenge.gov:** Federal Open Innovation Competitions and paid technology prize challenges (NIST, CMS, DHS, DOT).
   * **USAspending:** Historical federal award intelligence and obligations context.
   * **World Bank:** Multilateral development bank procurement and global advisory RFPs.
 * **European Union Ecosystem:**
@@ -26,6 +29,9 @@ Aggregates live opportunities through hardened, same-origin server bridges witho
 * **India Innovation Schemes & Public Procurement:**
   * **GeM (Government e-Marketplace):** Central/State public procurement contracts for Cloud Migration, DevOps, Custom Web/Mobile Apps, AI/OCR, and Cybersecurity. Includes direct tender document PDF links.
   * **CPPP (Central Public Procurement Portal):** Live active e-Procurement notices across ministries and PSUs.
+  * **Startup India Seed Fund Scheme (SISFS):** DPIIT and Central Ministry innovation challenges providing proof-of-concept and prototype scale-up funding up to ₹50 Lakhs.
+  * **T-Hub Enterprise Innovation:** Telangana Innovation Hub flagship accelerators (Lab32, T-AIM) and corporate BFSI pilot grants up to ₹40 Lakhs.
+  * **iCreate Prototyping & Scale-Up Grants:** International Centre for Entrepreneurship & Technology grants for edge AI, IoT telemetry, and cloud automation up to ₹50 Lakhs.
   * **MeitY & Central Grants:** SAMRIDH Accelerator, TIDE 2.0 (ICT grants), GENESIS (Tier-2/3 scale-up), Bhashini AI Mission, Chips to Startup (C2S), and Cyber Swachhta Kendra (CSK).
   * **Defence & Space:** iDEX (Defence India Startup Challenge DISC & SPARK grants up to ₹10 Cr), IN-SPACe seed fund.
   * **Biotech & HealthTech:** BIRAC (Biotechnology Industry Research Assistance Council) active Call for Proposals.
@@ -101,7 +107,7 @@ Exports qualified opportunities directly formatted for venture pipelines:
 * **Build System:** Vite 6 with TypeScript (`tsc -b`).
 * **Styling:** Custom accessible design system with CSS custom properties and full Dark Mode support.
 * **Backend / Host:** Hardened Node.js production host (`server/serve.ts`) mounting loopback-guarded live bridge proxies.
-* **Testing:** Native Node.js test runner with `tsx` (427+ unit and integration tests passing).
+* **Testing:** Native Node.js test runner with `tsx` (441+ unit and integration tests passing).
 
 ---
 
@@ -124,6 +130,12 @@ tvb-frontend/
 │   │   ├── enrichment-bridge/   # Firecrawl web scraping, domain resolution & dual presence
 │   │   ├── gem-bridge/          # GeM tender specifications & CPPP notices
 │   │   ├── india-grants-bridge/ # MeitY, iDEX, DST, BIRAC & state schemes
+│   │   ├── startup-india-bridge/# Startup India Seed Fund & national challenge bridge
+│   │   ├── thub-bridge/         # T-Hub enterprise accelerator & innovation bridge
+│   │   ├── icreate-bridge/      # iCreate deeptech prototyping & scale-up bridge
+│   │   ├── sam-bridge/          # US Federal SAM.gov RFP & solicitation bridge
+│   │   ├── sbir-bridge/         # US Federal SBIR/STTR innovation grant bridge
+│   │   ├── challenge-bridge/    # US Federal Challenge.gov tech prize bridge
 │   │   ├── grantsgov-bridge/    # US federal grants bridge
 │   │   ├── ted-bridge/          # European TED procurement bridge
 │   │   ├── eu-sedia-bridge/     # EU Horizon & cascade funding bridge

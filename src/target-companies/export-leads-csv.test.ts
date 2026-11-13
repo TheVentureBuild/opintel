@@ -10,6 +10,7 @@ import {
   generateLeadsCsv,
   countPotentialLeads,
   getLeadBatches,
+  buildOpportunityLeadRow,
 } from './export-leads-csv'
 import type { TargetCompanyLiveDiscoveryResult } from './live-discovery'
 import type { TargetRelevanceResult } from './matching'
@@ -222,3 +223,102 @@ test('generateLeadsCsv honors offset and limit options', () => {
   assert.equal(batch2Lines.length, 2) // 1 header + 1 row
   assert.ok(batch2Lines[1].includes('OPP-3'))
 })
+
+test('buildOpportunityLeadRow maps the 6 new sources to exact issuers, geographies, and currencies', () => {
+  const baseRec = {
+    companyId: 'pw-1',
+    companyName: 'Pace Wisdom Solutions',
+    outcome: 'relevant' as const,
+    score: 85,
+    scoreStatus: 'SCORED' as const,
+    coverage: 1,
+    factors: {} as any,
+    matchedFields: ['Software Services'],
+    mismatchedFields: [],
+    missingFields: [],
+    uncertainty: [],
+    reasons: ['Strong alignment'],
+    deadline: '2027-03-31',
+    status: 'Open',
+  }
+
+  // 1. SAM.gov
+  const samRow = buildOpportunityLeadRow(
+    { ...baseRec, opportunityId: 'SAM-1', opportunityTitle: 'Cloud Modernization RFP', opportunityType: 'procurement', sourceUrl: 'https://sam.gov/opp/abc/view' },
+    { source: 'sam', sourceRecordId: 'SAM-1', title: 'Cloud Modernization RFP', sourceUrl: 'https://sam.gov/opp/abc/view', description: 'SAM description', deadline: '2027-03-31', status: 'Active' },
+    'Software Services',
+    'Sathvika',
+  )
+  assert.equal(samRow[1], 'RFP')
+  assert.equal(samRow[3], 'US Federal Procurement Authority')
+  assert.equal(samRow[8], 'United States')
+  assert.equal(samRow[11], 'USD')
+  assert.equal(samRow[15], 'SAM.gov Federal Solicitations')
+  assert.equal(samRow[17], 'Sathvika')
+
+  // 2. SBIR.gov
+  const sbirRow = buildOpportunityLeadRow(
+    { ...baseRec, opportunityId: 'SBIR-1', opportunityTitle: 'DARPA AI Defense Call', opportunityType: 'funding', sourceUrl: 'https://www.sbir.gov/node/12345' },
+    { source: 'sbir', sourceRecordId: 'SBIR-1', title: 'DARPA AI Defense Call', sourceUrl: 'https://www.sbir.gov/node/12345', description: 'SBIR grant', deadline: '2027-03-31', status: 'Open' },
+    'Artificial Intelligence',
+    'Sathvika',
+  )
+  assert.equal(sbirRow[1], 'Grant')
+  assert.equal(sbirRow[3], 'US Federal SBIR / STTR Innovation Directorate')
+  assert.equal(sbirRow[8], 'United States')
+  assert.equal(sbirRow[11], 'USD')
+  assert.equal(sbirRow[15], 'SBIR.gov Innovation Grants')
+
+  // 3. Challenge.gov
+  const challengeRow = buildOpportunityLeadRow(
+    { ...baseRec, opportunityId: 'CHAL-1', opportunityTitle: 'NIST Cyber Challenge', opportunityType: 'funding', sourceUrl: 'https://www.challenge.gov/?challenge=cyber' },
+    { source: 'challenge', sourceRecordId: 'CHAL-1', title: 'NIST Cyber Challenge', sourceUrl: 'https://www.challenge.gov/?challenge=cyber', description: 'Prize challenge', deadline: '2027-03-31', status: 'Open' },
+    'Cybersecurity',
+    'Sathvika',
+  )
+  assert.equal(challengeRow[1], 'Grant')
+  assert.equal(challengeRow[3], 'US Federal Challenge Directorate (NIST / CMS / DHS)')
+  assert.equal(challengeRow[8], 'United States')
+  assert.equal(challengeRow[11], 'USD')
+  assert.equal(challengeRow[15], 'Challenge.gov Open Competitions')
+
+  // 4. Startup India
+  const startupIndiaRow = buildOpportunityLeadRow(
+    { ...baseRec, opportunityId: 'SI-1', opportunityTitle: 'SISFS Tech Scale-Up', opportunityType: 'funding', sourceUrl: 'https://seedfund.startupindia.gov.in/' },
+    { source: 'startup-india', sourceRecordId: 'SI-1', title: 'SISFS Tech Scale-Up', sourceUrl: 'https://seedfund.startupindia.gov.in/', description: 'Seed fund', deadline: '2027-03-31', status: 'Open' },
+    'Software Services',
+    'Sathvika',
+  )
+  assert.equal(startupIndiaRow[1], 'Grant')
+  assert.equal(startupIndiaRow[3], 'DPIIT & Central Ministries (Startup India)')
+  assert.equal(startupIndiaRow[8], 'India')
+  assert.equal(startupIndiaRow[11], 'INR')
+  assert.equal(startupIndiaRow[15], 'Startup India Seed Fund Scheme')
+
+  // 5. T-Hub
+  const thubRow = buildOpportunityLeadRow(
+    { ...baseRec, opportunityId: 'THUB-1', opportunityTitle: 'T-Hub Lab32 Market Readiness', opportunityType: 'funding', sourceUrl: 'https://t-hub.co/programs/' },
+    { source: 'thub', sourceRecordId: 'THUB-1', title: 'T-Hub Lab32 Market Readiness', sourceUrl: 'https://t-hub.co/programs/', description: 'PoC grant', deadline: '2027-03-31', status: 'Open' },
+    'Software Services',
+    'Sathvika',
+  )
+  assert.equal(thubRow[1], 'Grant')
+  assert.equal(thubRow[3], 'T-Hub Foundation & State of Telangana')
+  assert.equal(thubRow[8], 'India')
+  assert.equal(thubRow[11], 'INR')
+  assert.equal(thubRow[15], 'T-Hub Innovation Accelerators')
+
+  // 6. iCreate
+  const icreateRow = buildOpportunityLeadRow(
+    { ...baseRec, opportunityId: 'ICREATE-1', opportunityTitle: 'iCreate Spark Prototyping', opportunityType: 'funding', sourceUrl: 'https://www.icreate.org.in/programs/' },
+    { source: 'icreate', sourceRecordId: 'ICREATE-1', title: 'iCreate Spark Prototyping', sourceUrl: 'https://www.icreate.org.in/programs/', description: 'Spark grant', deadline: '2027-03-31', status: 'Open' },
+    'DeepTech & IoT',
+    'Sathvika',
+  )
+  assert.equal(icreateRow[1], 'Grant')
+  assert.equal(icreateRow[3], 'iCreate & MeitY DeepTech Directorate')
+  assert.equal(icreateRow[8], 'India')
+  assert.equal(icreateRow[11], 'INR')
+  assert.equal(icreateRow[15], 'iCreate Tech Prototyping Grants')
+})
+

@@ -23,6 +23,12 @@ import type { TedBridgeSearchResponse } from '../live-source/ted-bridge/contract
 import type { GemBridgeSearchResponse, GemNotice } from '../live-source/gem-bridge/contract'
 import type { IndiaGrantsBridgeSearchResponse, IndiaGrantOpportunity } from '../live-source/india-grants-bridge/contract'
 import type { WorldBankBridgeSearchResponse, WorldBankNotice } from '../live-source/worldbank-bridge/contract'
+import type { SamBridgeSearchResponse, SamNotice } from '../live-source/sam-bridge/contract'
+import type { SbirBridgeSearchResponse, SbirNotice } from '../live-source/sbir-bridge/contract'
+import type { ChallengeBridgeSearchResponse, ChallengeNotice } from '../live-source/challenge-bridge/contract'
+import type { StartupIndiaBridgeSearchResponse, StartupIndiaNotice } from '../live-source/startup-india-bridge/contract'
+import type { ThubBridgeSearchResponse, ThubNotice } from '../live-source/thub-bridge/contract'
+import type { IcreateBridgeSearchResponse, IcreateNotice } from '../live-source/icreate-bridge/contract'
 
 function extractResponseErrors(response: unknown, fallback: string): string[] {
   const res = response as { errors?: Array<{ message?: string }>; error?: { message?: string } } | null | undefined
@@ -35,7 +41,19 @@ function extractResponseErrors(response: unknown, fallback: string): string[] {
   return [fallback]
 }
 
-export type TargetDiscoverySourceType = 'grantsgov' | 'eu-sedia' | 'ted' | 'gem' | 'india-grants' | 'worldbank'
+export type TargetDiscoverySourceType =
+  | 'grantsgov'
+  | 'eu-sedia'
+  | 'ted'
+  | 'gem'
+  | 'india-grants'
+  | 'worldbank'
+  | 'sam'
+  | 'sbir'
+  | 'challenge'
+  | 'startup-india'
+  | 'thub'
+  | 'icreate'
 
 export interface TargetCompanyLiveDiscoveryRecord {
   readonly source: TargetDiscoverySourceType
@@ -72,7 +90,21 @@ export interface TargetCompanyLiveDiscoveryResult {
 export function isOpportunityOpen(deadline: string | null | undefined, status: string | null | undefined): boolean {
   if (status) {
     const s = status.toLowerCase()
-    if (s.includes('closed') || s.includes('archived') || s.includes('expired') || s.includes('cancelled')) {
+    if (
+      s.includes('closed') ||
+      s.includes('archived') ||
+      s.includes('expired') ||
+      s.includes('cancelled') ||
+      s.includes('awarded') ||
+      s.includes('conquered') ||
+      s.includes('contract award') ||
+      s.includes('award notice') ||
+      s.includes('aoc') ||
+      s.includes('winner') ||
+      s.includes('results of') ||
+      s.includes('completed') ||
+      s.includes('decided')
+    ) {
       return false
     }
   }
@@ -184,6 +216,102 @@ export function worldBankRawToOpportunity(record: TargetCompanyLiveDiscoveryReco
   }
 }
 
+export function samRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
+  return {
+    opportunityId: record.sourceRecordId ?? record.sourceUrl,
+    opportunityType: 'procurement',
+    title: record.title,
+    description: record.description,
+    country: 'US',
+    sectors: record.sectors ?? null,
+    requirements: record.requirements ?? null,
+    applicantTypes: record.applicantTypes ?? ['commercial', 'for-profit', 'sme', 'startup'],
+    deadline: record.deadline,
+    status: record.status,
+    sourceUrl: record.sourceUrl,
+  }
+}
+
+export function sbirRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
+  return {
+    opportunityId: record.sourceRecordId ?? record.sourceUrl,
+    opportunityType: 'funding',
+    title: record.title,
+    description: record.description,
+    country: 'US',
+    sectors: record.sectors ?? null,
+    requirements: record.requirements ?? null,
+    applicantTypes: record.applicantTypes ?? ['commercial', 'for-profit', 'sme', 'startup'],
+    deadline: record.deadline,
+    status: record.status,
+    sourceUrl: record.sourceUrl,
+  }
+}
+
+export function challengeRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
+  return {
+    opportunityId: record.sourceRecordId ?? record.sourceUrl,
+    opportunityType: 'funding',
+    title: record.title,
+    description: record.description,
+    country: 'US',
+    sectors: record.sectors ?? null,
+    requirements: record.requirements ?? null,
+    applicantTypes: record.applicantTypes ?? ['commercial', 'for-profit', 'sme', 'startup', 'individual'],
+    deadline: record.deadline,
+    status: record.status,
+    sourceUrl: record.sourceUrl,
+  }
+}
+
+export function startupIndiaRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
+  return {
+    opportunityId: record.sourceRecordId ?? record.sourceUrl,
+    opportunityType: 'funding',
+    title: record.title,
+    description: record.description,
+    country: 'IN',
+    sectors: record.sectors ?? null,
+    requirements: record.requirements ?? null,
+    applicantTypes: record.applicantTypes ?? ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
+    deadline: record.deadline,
+    status: record.status,
+    sourceUrl: record.sourceUrl,
+  }
+}
+
+export function thubRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
+  return {
+    opportunityId: record.sourceRecordId ?? record.sourceUrl,
+    opportunityType: 'funding',
+    title: record.title,
+    description: record.description,
+    country: 'IN',
+    sectors: record.sectors ?? null,
+    requirements: record.requirements ?? null,
+    applicantTypes: record.applicantTypes ?? ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
+    deadline: record.deadline,
+    status: record.status,
+    sourceUrl: record.sourceUrl,
+  }
+}
+
+export function icreateRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
+  return {
+    opportunityId: record.sourceRecordId ?? record.sourceUrl,
+    opportunityType: 'funding',
+    title: record.title,
+    description: record.description,
+    country: 'IN',
+    sectors: record.sectors ?? null,
+    requirements: record.requirements ?? null,
+    applicantTypes: record.applicantTypes ?? ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
+    deadline: record.deadline,
+    status: record.status,
+    sourceUrl: record.sourceUrl,
+  }
+}
+
 export function recordToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
   switch (record.source) {
     case 'gem':
@@ -192,6 +320,18 @@ export function recordToOpportunity(record: TargetCompanyLiveDiscoveryRecord): T
       return indiaGrantsRawToOpportunity(record)
     case 'worldbank':
       return worldBankRawToOpportunity(record)
+    case 'sam':
+      return samRawToOpportunity(record)
+    case 'sbir':
+      return sbirRawToOpportunity(record)
+    case 'challenge':
+      return challengeRawToOpportunity(record)
+    case 'startup-india':
+      return startupIndiaRawToOpportunity(record)
+    case 'thub':
+      return thubRawToOpportunity(record)
+    case 'icreate':
+      return icreateRawToOpportunity(record)
     case 'ted':
       return tedRawToOpportunity(record)
     case 'grantsgov':
@@ -669,6 +809,438 @@ export async function runTargetCompanyWorldBankDiscovery(
     recommendations,
     errors,
     sourceResults: [{ source: 'worldbank', queries: uniqueTerms, recordCount: records.length, errors }],
+    newRecordCount,
+  }
+}
+
+export async function runTargetCompanySamDiscovery(
+  profile: TargetCompanyMatchInput,
+  requester: (term: string) => Promise<SamBridgeSearchResponse>,
+): Promise<TargetCompanyLiveDiscoveryResult> {
+  const queries = buildCompanyDiscoveryQueries(profile)
+  const uniqueTerms = [...new Set(queries.map((query) => query.term))]
+  const recordsById = new Map<string, TargetCompanyLiveDiscoveryRecord>()
+  const errors: string[] = []
+
+  for (const term of uniqueTerms) {
+    if (term === '') continue
+    let response: SamBridgeSearchResponse
+    try {
+      response = await requester(term)
+    } catch (error) {
+      errors.push(`SAM.gov request failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    if (!response.ok || (typeof response.status === 'number' && response.status >= 400)) {
+      errors.push(...extractResponseErrors(response, `SAM.gov bridge request failed (status ${response.status})`))
+      continue
+    }
+    if (!response.body || (typeof response.body === 'string' && response.body.trim().startsWith('<'))) {
+      errors.push(`SAM.gov source returned an HTML response instead of JSON (status ${response.status})`)
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(response.body) as { notices?: readonly SamNotice[] }
+      const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
+      for (const notice of notices) {
+        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        const id = `sam:${notice.noticeId}`
+        if (!recordsById.has(id)) {
+          recordsById.set(id, {
+            source: 'sam',
+            sourceRecordId: notice.noticeId,
+            title: notice.title,
+            sourceUrl: notice.portalUrl,
+            description: `${notice.description} (Agency: ${notice.agency} | Value: ${notice.valueUsd} | Set-Aside: ${notice.setAside})`,
+            deadline: notice.deadline,
+            status: notice.status,
+            sectors: notice.categories,
+            requirements: notice.requirements,
+            applicantTypes: ['commercial', 'for-profit', 'sme', 'startup'],
+            country: 'US',
+          })
+        }
+      }
+    } catch (parseErr) {
+      errors.push(`Failed to parse SAM.gov response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`)
+    }
+  }
+
+  const records = [...recordsById.values()]
+  const known = loadKnownDiscoveryIds()
+  const newRecordCount = records.filter((record) => !known.has(record.sourceRecordId ?? record.sourceUrl)).length
+  saveKnownDiscoveryIds(records.map((record) => record.sourceRecordId ?? record.sourceUrl))
+  const opportunities = records.map(samRawToOpportunity)
+  const recommendations = recommendOpportunitiesForTargetCompanies([profile], opportunities)
+
+  return {
+    profile,
+    queries: uniqueTerms,
+    records,
+    recommendations,
+    errors,
+    sourceResults: [{ source: 'sam', queries: uniqueTerms, recordCount: records.length, errors }],
+    newRecordCount,
+  }
+}
+
+export async function runTargetCompanySbirDiscovery(
+  profile: TargetCompanyMatchInput,
+  requester: (term: string) => Promise<SbirBridgeSearchResponse>,
+): Promise<TargetCompanyLiveDiscoveryResult> {
+  const queries = buildCompanyDiscoveryQueries(profile)
+  const uniqueTerms = [...new Set(queries.map((query) => query.term))]
+  const recordsById = new Map<string, TargetCompanyLiveDiscoveryRecord>()
+  const errors: string[] = []
+
+  for (const term of uniqueTerms) {
+    if (term === '') continue
+    let response: SbirBridgeSearchResponse
+    try {
+      response = await requester(term)
+    } catch (error) {
+      errors.push(`SBIR.gov request failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    if (!response.ok || (typeof response.status === 'number' && response.status >= 400)) {
+      errors.push(...extractResponseErrors(response, `SBIR.gov bridge request failed (status ${response.status})`))
+      continue
+    }
+    if (!response.body || (typeof response.body === 'string' && response.body.trim().startsWith('<'))) {
+      errors.push(`SBIR.gov source returned an HTML response instead of JSON (status ${response.status})`)
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(response.body) as { notices?: readonly SbirNotice[] }
+      const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
+      for (const notice of notices) {
+        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        const id = `sbir:${notice.topicId}`
+        if (!recordsById.has(id)) {
+          recordsById.set(id, {
+            source: 'sbir',
+            sourceRecordId: notice.topicId,
+            title: notice.title,
+            sourceUrl: notice.portalUrl,
+            description: `${notice.description} (Agency: ${notice.agency} | Program: ${notice.program} | Award: ${notice.awardAmountUsd})`,
+            deadline: notice.deadline,
+            status: notice.status,
+            sectors: notice.sectors,
+            requirements: null,
+            applicantTypes: notice.eligibleEntities,
+            country: 'US',
+          })
+        }
+      }
+    } catch (parseErr) {
+      errors.push(`Failed to parse SBIR.gov response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`)
+    }
+  }
+
+  const records = [...recordsById.values()]
+  const known = loadKnownDiscoveryIds()
+  const newRecordCount = records.filter((record) => !known.has(record.sourceRecordId ?? record.sourceUrl)).length
+  saveKnownDiscoveryIds(records.map((record) => record.sourceRecordId ?? record.sourceUrl))
+  const opportunities = records.map(sbirRawToOpportunity)
+  const recommendations = recommendOpportunitiesForTargetCompanies([profile], opportunities)
+
+  return {
+    profile,
+    queries: uniqueTerms,
+    records,
+    recommendations,
+    errors,
+    sourceResults: [{ source: 'sbir', queries: uniqueTerms, recordCount: records.length, errors }],
+    newRecordCount,
+  }
+}
+
+export async function runTargetCompanyChallengeDiscovery(
+  profile: TargetCompanyMatchInput,
+  requester: (term: string) => Promise<ChallengeBridgeSearchResponse>,
+): Promise<TargetCompanyLiveDiscoveryResult> {
+  const queries = buildCompanyDiscoveryQueries(profile)
+  const uniqueTerms = [...new Set(queries.map((query) => query.term))]
+  const recordsById = new Map<string, TargetCompanyLiveDiscoveryRecord>()
+  const errors: string[] = []
+
+  for (const term of uniqueTerms) {
+    if (term === '') continue
+    let response: ChallengeBridgeSearchResponse
+    try {
+      response = await requester(term)
+    } catch (error) {
+      errors.push(`Challenge.gov request failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    if (!response.ok || (typeof response.status === 'number' && response.status >= 400)) {
+      errors.push(...extractResponseErrors(response, `Challenge.gov bridge request failed (status ${response.status})`))
+      continue
+    }
+    if (!response.body || (typeof response.body === 'string' && response.body.trim().startsWith('<'))) {
+      errors.push(`Challenge.gov source returned an HTML response instead of JSON (status ${response.status})`)
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(response.body) as { notices?: readonly ChallengeNotice[] }
+      const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
+      for (const notice of notices) {
+        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        const id = `challenge:${notice.challengeId}`
+        if (!recordsById.has(id)) {
+          recordsById.set(id, {
+            source: 'challenge',
+            sourceRecordId: notice.challengeId,
+            title: notice.title,
+            sourceUrl: notice.portalUrl,
+            description: `${notice.description} (Agency: ${notice.agency} | Prize Pool: ${notice.prizePoolUsd})`,
+            deadline: notice.deadline,
+            status: notice.status,
+            sectors: notice.categories,
+            requirements: null,
+            applicantTypes: notice.eligibleEntities,
+            country: 'US',
+          })
+        }
+      }
+    } catch (parseErr) {
+      errors.push(`Failed to parse Challenge.gov response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`)
+    }
+  }
+
+  const records = [...recordsById.values()]
+  const known = loadKnownDiscoveryIds()
+  const newRecordCount = records.filter((record) => !known.has(record.sourceRecordId ?? record.sourceUrl)).length
+  saveKnownDiscoveryIds(records.map((record) => record.sourceRecordId ?? record.sourceUrl))
+  const opportunities = records.map(challengeRawToOpportunity)
+  const recommendations = recommendOpportunitiesForTargetCompanies([profile], opportunities)
+
+  return {
+    profile,
+    queries: uniqueTerms,
+    records,
+    recommendations,
+    errors,
+    sourceResults: [{ source: 'challenge', queries: uniqueTerms, recordCount: records.length, errors }],
+    newRecordCount,
+  }
+}
+
+export async function runTargetCompanyStartupIndiaDiscovery(
+  profile: TargetCompanyMatchInput,
+  requester: (term: string) => Promise<StartupIndiaBridgeSearchResponse>,
+): Promise<TargetCompanyLiveDiscoveryResult> {
+  const queries = buildCompanyDiscoveryQueries(profile)
+  const uniqueTerms = [...new Set(queries.map((query) => query.term))]
+  const recordsById = new Map<string, TargetCompanyLiveDiscoveryRecord>()
+  const errors: string[] = []
+
+  for (const term of uniqueTerms) {
+    if (term === '') continue
+    let response: StartupIndiaBridgeSearchResponse
+    try {
+      response = await requester(term)
+    } catch (error) {
+      errors.push(`Startup India request failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    if (!response.ok || (typeof response.status === 'number' && response.status >= 400)) {
+      errors.push(...extractResponseErrors(response, `Startup India bridge request failed (status ${response.status})`))
+      continue
+    }
+    if (!response.body || (typeof response.body === 'string' && response.body.trim().startsWith('<'))) {
+      errors.push(`Startup India source returned an HTML response instead of JSON (status ${response.status})`)
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(response.body) as { notices?: readonly StartupIndiaNotice[] }
+      const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
+      for (const notice of notices) {
+        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        const id = `startup-india:${notice.programId}`
+        if (!recordsById.has(id)) {
+          recordsById.set(id, {
+            source: 'startup-india',
+            sourceRecordId: notice.programId,
+            title: notice.title,
+            sourceUrl: notice.portalUrl,
+            description: `${notice.description} (Ministry: ${notice.ministry} | Grant: ${notice.grantAmountInr})`,
+            deadline: notice.deadline,
+            status: notice.status,
+            sectors: notice.categories,
+            requirements: null,
+            applicantTypes: notice.eligibleEntities,
+            country: 'IN',
+          })
+        }
+      }
+    } catch (parseErr) {
+      errors.push(`Failed to parse Startup India response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`)
+    }
+  }
+
+  const records = [...recordsById.values()]
+  const known = loadKnownDiscoveryIds()
+  const newRecordCount = records.filter((record) => !known.has(record.sourceRecordId ?? record.sourceUrl)).length
+  saveKnownDiscoveryIds(records.map((record) => record.sourceRecordId ?? record.sourceUrl))
+  const opportunities = records.map(startupIndiaRawToOpportunity)
+  const recommendations = recommendOpportunitiesForTargetCompanies([profile], opportunities)
+
+  return {
+    profile,
+    queries: uniqueTerms,
+    records,
+    recommendations,
+    errors,
+    sourceResults: [{ source: 'startup-india', queries: uniqueTerms, recordCount: records.length, errors }],
+    newRecordCount,
+  }
+}
+
+export async function runTargetCompanyThubDiscovery(
+  profile: TargetCompanyMatchInput,
+  requester: (term: string) => Promise<ThubBridgeSearchResponse>,
+): Promise<TargetCompanyLiveDiscoveryResult> {
+  const queries = buildCompanyDiscoveryQueries(profile)
+  const uniqueTerms = [...new Set(queries.map((query) => query.term))]
+  const recordsById = new Map<string, TargetCompanyLiveDiscoveryRecord>()
+  const errors: string[] = []
+
+  for (const term of uniqueTerms) {
+    if (term === '') continue
+    let response: ThubBridgeSearchResponse
+    try {
+      response = await requester(term)
+    } catch (error) {
+      errors.push(`T-Hub request failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    if (!response.ok || (typeof response.status === 'number' && response.status >= 400)) {
+      errors.push(...extractResponseErrors(response, `T-Hub bridge request failed (status ${response.status})`))
+      continue
+    }
+    if (!response.body || (typeof response.body === 'string' && response.body.trim().startsWith('<'))) {
+      errors.push(`T-Hub source returned an HTML response instead of JSON (status ${response.status})`)
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(response.body) as { notices?: readonly ThubNotice[] }
+      const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
+      for (const notice of notices) {
+        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        const id = `thub:${notice.programId}`
+        if (!recordsById.has(id)) {
+          recordsById.set(id, {
+            source: 'thub',
+            sourceRecordId: notice.programId,
+            title: notice.title,
+            sourceUrl: notice.portalUrl,
+            description: `${notice.description} (Organization: ${notice.organization} | Grant: ${notice.grantAmountInr})`,
+            deadline: notice.deadline,
+            status: notice.status,
+            sectors: notice.categories,
+            requirements: null,
+            applicantTypes: notice.eligibleEntities,
+            country: 'IN',
+          })
+        }
+      }
+    } catch (parseErr) {
+      errors.push(`Failed to parse T-Hub response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`)
+    }
+  }
+
+  const records = [...recordsById.values()]
+  const known = loadKnownDiscoveryIds()
+  const newRecordCount = records.filter((record) => !known.has(record.sourceRecordId ?? record.sourceUrl)).length
+  saveKnownDiscoveryIds(records.map((record) => record.sourceRecordId ?? record.sourceUrl))
+  const opportunities = records.map(thubRawToOpportunity)
+  const recommendations = recommendOpportunitiesForTargetCompanies([profile], opportunities)
+
+  return {
+    profile,
+    queries: uniqueTerms,
+    records,
+    recommendations,
+    errors,
+    sourceResults: [{ source: 'thub', queries: uniqueTerms, recordCount: records.length, errors }],
+    newRecordCount,
+  }
+}
+
+export async function runTargetCompanyIcreateDiscovery(
+  profile: TargetCompanyMatchInput,
+  requester: (term: string) => Promise<IcreateBridgeSearchResponse>,
+): Promise<TargetCompanyLiveDiscoveryResult> {
+  const queries = buildCompanyDiscoveryQueries(profile)
+  const uniqueTerms = [...new Set(queries.map((query) => query.term))]
+  const recordsById = new Map<string, TargetCompanyLiveDiscoveryRecord>()
+  const errors: string[] = []
+
+  for (const term of uniqueTerms) {
+    if (term === '') continue
+    let response: IcreateBridgeSearchResponse
+    try {
+      response = await requester(term)
+    } catch (error) {
+      errors.push(`iCreate request failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    if (!response.ok || (typeof response.status === 'number' && response.status >= 400)) {
+      errors.push(...extractResponseErrors(response, `iCreate bridge request failed (status ${response.status})`))
+      continue
+    }
+    if (!response.body || (typeof response.body === 'string' && response.body.trim().startsWith('<'))) {
+      errors.push(`iCreate source returned an HTML response instead of JSON (status ${response.status})`)
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(response.body) as { notices?: readonly IcreateNotice[] }
+      const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
+      for (const notice of notices) {
+        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        const id = `icreate:${notice.noticeId}`
+        if (!recordsById.has(id)) {
+          recordsById.set(id, {
+            source: 'icreate',
+            sourceRecordId: notice.noticeId,
+            title: notice.title,
+            sourceUrl: notice.portalUrl,
+            description: `${notice.description} (Organization: ${notice.organization} | Grant: ${notice.grantAmountInr})`,
+            deadline: notice.deadline,
+            status: notice.status,
+            sectors: notice.categories,
+            requirements: null,
+            applicantTypes: notice.eligibleEntities,
+            country: 'IN',
+          })
+        }
+      }
+    } catch (parseErr) {
+      errors.push(`Failed to parse iCreate response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`)
+    }
+  }
+
+  const records = [...recordsById.values()]
+  const known = loadKnownDiscoveryIds()
+  const newRecordCount = records.filter((record) => !known.has(record.sourceRecordId ?? record.sourceUrl)).length
+  saveKnownDiscoveryIds(records.map((record) => record.sourceRecordId ?? record.sourceUrl))
+  const opportunities = records.map(icreateRawToOpportunity)
+  const recommendations = recommendOpportunitiesForTargetCompanies([profile], opportunities)
+
+  return {
+    profile,
+    queries: uniqueTerms,
+    records,
+    recommendations,
+    errors,
+    sourceResults: [{ source: 'icreate', queries: uniqueTerms, recordCount: records.length, errors }],
     newRecordCount,
   }
 }

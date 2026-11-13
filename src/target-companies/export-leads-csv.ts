@@ -115,54 +115,91 @@ export function buildOpportunityLeadRow(
 
   const sourceHost = rec.sourceUrl.toLowerCase()
   const isGrantsGov = record?.source === 'grantsgov' || sourceHost.includes('grants.gov')
+  const isSam = record?.source === 'sam' || sourceHost.includes('sam.gov')
+  const isSbir = record?.source === 'sbir' || sourceHost.includes('sbir.gov')
+  const isChallenge = record?.source === 'challenge' || sourceHost.includes('challenge.gov')
   const isTed = record?.source === 'ted' || sourceHost.includes('ted.europa.eu')
   const isEu = record?.source === 'eu-sedia' || sourceHost.includes('europa.eu')
   const isGem = record?.source === 'gem' || sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
+  const isStartupIndia = record?.source === 'startup-india' || sourceHost.includes('seedfund.startupindia.gov.in') || sourceHost.includes('startupindia')
+  const isThub = record?.source === 'thub' || sourceHost.includes('t-hub.co')
+  const isIcreate = record?.source === 'icreate' || sourceHost.includes('icreate.org.in')
   const isIndiaGrants =
     record?.source === 'india-grants' ||
     sourceHost.includes('meity') ||
     sourceHost.includes('idex') ||
-    sourceHost.includes('startupindia') ||
     sourceHost.includes('birac')
   const isWorldBank = record?.source === 'worldbank' || sourceHost.includes('worldbank.org')
 
   const sourceName = isGrantsGov
     ? 'Grants.gov'
-    : isTed
-      ? 'TED Procurement'
-      : isEu
-        ? 'EU Funding & Tenders'
-        : isGem
-          ? 'GeM & CPPP India'
-          : isIndiaGrants
-            ? 'MeitY / iDEX Innovation Grants'
-            : isWorldBank
-              ? 'World Bank Procurement'
-              : 'Public Source'
+    : isSam
+      ? 'SAM.gov Federal Solicitations'
+      : isSbir
+        ? 'SBIR.gov Innovation Grants'
+        : isChallenge
+          ? 'Challenge.gov Open Competitions'
+          : isStartupIndia
+            ? 'Startup India Seed Fund Scheme'
+            : isThub
+              ? 'T-Hub Innovation Accelerators'
+              : isIcreate
+                ? 'iCreate Tech Prototyping Grants'
+                : isTed
+                  ? 'TED Procurement'
+                  : isEu
+                    ? 'EU Funding & Tenders'
+                    : isGem
+                      ? 'GeM & CPPP India'
+                      : isIndiaGrants
+                        ? 'MeitY / iDEX Innovation Grants'
+                        : isWorldBank
+                          ? 'World Bank Procurement'
+                          : 'Public Source'
 
-  const issuer = isGrantsGov
-    ? 'US Federal Agency'
-    : isTed
-      ? 'European Public Procurement Authority'
-      : isEu
-        ? 'European Commission'
-        : isGem
-          ? 'Government of India (GeM/CPPP)'
-          : isIndiaGrants
-            ? 'MeitY / Ministry of Defence / DPIIT'
-            : isWorldBank
-              ? 'World Bank & Multilateral Development Banks'
-              : 'Public Authority'
+  const issuer = isSam
+    ? 'US Federal Procurement Authority'
+    : isSbir
+      ? 'US Federal SBIR / STTR Innovation Directorate'
+      : isChallenge
+        ? 'US Federal Challenge Directorate (NIST / CMS / DHS)'
+        : isStartupIndia
+          ? 'DPIIT & Central Ministries (Startup India)'
+          : isThub
+            ? 'T-Hub Foundation & State of Telangana'
+            : isIcreate
+              ? 'iCreate & MeitY DeepTech Directorate'
+              : isGrantsGov
+                ? 'US Federal Agency'
+                : isTed
+                  ? 'European Public Procurement Authority'
+                  : isEu
+                    ? 'European Commission'
+                    : isGem
+                      ? 'Government of India (GeM/CPPP)'
+                      : isIndiaGrants
+                        ? 'MeitY / Ministry of Defence / DPIIT'
+                        : isWorldBank
+                          ? 'World Bank & Multilateral Development Banks'
+                          : 'Public Authority'
 
-  const geography = isGrantsGov
-    ? 'United States'
-    : isTed || isEu
-      ? 'European Union'
-      : isGem || isIndiaGrants
-        ? 'India'
-        : 'International / Global'
+  const geography =
+    isGrantsGov || isSam || isSbir || isChallenge
+      ? 'United States'
+      : isTed || isEu
+        ? 'European Union'
+        : isGem || isIndiaGrants || isStartupIndia || isThub || isIcreate
+          ? 'India'
+          : 'International / Global'
 
-  const currency = isGrantsGov || isWorldBank ? 'USD' : isTed || isEu ? 'EUR' : isGem || isIndiaGrants ? 'INR' : 'USD'
+  const currency =
+    isGrantsGov || isSam || isSbir || isChallenge || isWorldBank
+      ? 'USD'
+      : isTed || isEu
+        ? 'EUR'
+        : isGem || isIndiaGrants || isStartupIndia || isThub || isIcreate
+          ? 'INR'
+          : 'USD'
   const fitScore = fitScore1to5(rec.score, rec.outcome)
 
   const sector =

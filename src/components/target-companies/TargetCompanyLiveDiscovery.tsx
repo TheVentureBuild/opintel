@@ -12,6 +12,18 @@ import { INDIA_GRANTS_BRIDGE_SEARCH_PATH } from '../../live-source/india-grants-
 import type { IndiaGrantsBridgeSearchResponse } from '../../live-source/india-grants-bridge/contract'
 import { WORLDBANK_BRIDGE_SEARCH_PATH } from '../../live-source/worldbank-bridge/contract'
 import type { WorldBankBridgeSearchResponse } from '../../live-source/worldbank-bridge/contract'
+import { SAM_BRIDGE_SEARCH_PATH } from '../../live-source/sam-bridge/contract'
+import type { SamBridgeSearchResponse } from '../../live-source/sam-bridge/contract'
+import { SBIR_BRIDGE_SEARCH_PATH } from '../../live-source/sbir-bridge/contract'
+import type { SbirBridgeSearchResponse } from '../../live-source/sbir-bridge/contract'
+import { CHALLENGE_BRIDGE_SEARCH_PATH } from '../../live-source/challenge-bridge/contract'
+import type { ChallengeBridgeSearchResponse } from '../../live-source/challenge-bridge/contract'
+import { STARTUP_INDIA_BRIDGE_SEARCH_PATH } from '../../live-source/startup-india-bridge/contract'
+import type { StartupIndiaBridgeSearchResponse } from '../../live-source/startup-india-bridge/contract'
+import { THUB_BRIDGE_SEARCH_PATH } from '../../live-source/thub-bridge/contract'
+import type { ThubBridgeSearchResponse } from '../../live-source/thub-bridge/contract'
+import { ICREATE_BRIDGE_SEARCH_PATH } from '../../live-source/icreate-bridge/contract'
+import type { IcreateBridgeSearchResponse } from '../../live-source/icreate-bridge/contract'
 import { resolveBridgeUrl } from '../../live-source/bridge-url'
 import { loadImportedTargetCompanies } from '../../target-companies/store'
 import { csvPreviewToTargetCompanies } from '../../target-companies/profiles'
@@ -19,10 +31,17 @@ import { buildCompanyDiscoveryQueries } from '../../target-companies/discovery-q
 import {
   groupTargetRecommendations,
   runTargetCompanyDiscovery,
+  runTargetCompanyGrantsGovDiscovery,
   runTargetCompanyTedDiscovery,
   runTargetCompanyGemDiscovery,
   runTargetCompanyIndiaGrantsDiscovery,
   runTargetCompanyWorldBankDiscovery,
+  runTargetCompanySamDiscovery,
+  runTargetCompanySbirDiscovery,
+  runTargetCompanyChallengeDiscovery,
+  runTargetCompanyStartupIndiaDiscovery,
+  runTargetCompanyThubDiscovery,
+  runTargetCompanyIcreateDiscovery,
   mergeDiscoveryResults,
 } from '../../target-companies/live-discovery'
 import type { TargetCompanyLiveDiscoveryResult } from '../../target-companies/live-discovery'
@@ -80,32 +99,56 @@ function syncRecommendationsToReviewQueue(
         sourceHost = new URL(rec.sourceUrl).hostname.toLowerCase()
       } catch {}
 
-      const sourceId = sourceHost.includes('grants.gov')
-        ? 'SU-GRANTS-001'
-        : sourceHost.includes('ted.europa.eu')
-          ? 'SU-TED-001'
-          : sourceHost.includes('europa.eu')
-            ? 'SU-EU-SEDIA-001'
-            : sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
-              ? 'SU-GEM-001'
-              : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('startupindia') || sourceHost.includes('birac')
-                ? 'SU-INDIA-GRANTS-001'
-                : sourceHost.includes('worldbank.org')
-                  ? 'SU-WORLDBANK-001'
-                  : 'SU-LIVE-001'
-      const sourceName = sourceHost.includes('grants.gov')
-        ? 'Grants.gov'
-        : sourceHost.includes('ted.europa.eu')
-          ? 'TED Procurement'
-          : sourceHost.includes('europa.eu')
-            ? 'EU SEDIA'
-            : sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
-              ? 'GeM & CPPP India'
-              : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('startupindia') || sourceHost.includes('birac')
-                ? 'MeitY / iDEX Innovation Grants'
-                : sourceHost.includes('worldbank.org')
-                  ? 'World Bank Procurement'
-                  : sourceHost
+      const sourceId = sourceHost.includes('sam.gov')
+        ? 'SU-SAM-001'
+        : sourceHost.includes('sbir.gov')
+          ? 'SU-SBIR-001'
+          : sourceHost.includes('challenge.gov')
+            ? 'SU-CHALLENGE-001'
+            : sourceHost.includes('grants.gov')
+              ? 'SU-GRANTS-001'
+              : sourceHost.includes('seedfund.startupindia.gov.in') || sourceHost.includes('startupindia')
+                ? 'SU-STARTUP-INDIA-001'
+                : sourceHost.includes('t-hub.co')
+                  ? 'SU-THUB-001'
+                  : sourceHost.includes('icreate.org.in')
+                    ? 'SU-ICREATE-001'
+                    : sourceHost.includes('ted.europa.eu')
+                      ? 'SU-TED-001'
+                      : sourceHost.includes('europa.eu')
+                        ? 'SU-EU-SEDIA-001'
+                        : sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
+                          ? 'SU-GEM-001'
+                          : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('birac')
+                            ? 'SU-INDIA-GRANTS-001'
+                            : sourceHost.includes('worldbank.org')
+                              ? 'SU-WORLDBANK-001'
+                              : 'SU-LIVE-001'
+      const sourceName = sourceHost.includes('sam.gov')
+        ? 'SAM.gov Federal Solicitations'
+        : sourceHost.includes('sbir.gov')
+          ? 'SBIR.gov Innovation Grants'
+          : sourceHost.includes('challenge.gov')
+            ? 'Challenge.gov Competitions'
+            : sourceHost.includes('grants.gov')
+              ? 'Grants.gov'
+              : sourceHost.includes('seedfund.startupindia.gov.in') || sourceHost.includes('startupindia')
+                ? 'Startup India Seed Fund Scheme'
+                : sourceHost.includes('t-hub.co')
+                  ? 'T-Hub Innovation Accelerators'
+                  : sourceHost.includes('icreate.org.in')
+                    ? 'iCreate Prototyping Grants'
+                    : sourceHost.includes('ted.europa.eu')
+                      ? 'TED Procurement'
+                      : sourceHost.includes('europa.eu')
+                        ? 'EU SEDIA'
+                        : sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
+                          ? 'GeM & CPPP India'
+                          : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('birac')
+                            ? 'MeitY / iDEX Innovation Grants'
+                            : sourceHost.includes('worldbank.org')
+                              ? 'World Bank Procurement'
+                              : sourceHost
 
       const rawType = rec.opportunityType === 'procurement' ? 'RFP' : 'GRANT'
       const candidateId = `${sourceId}:${rec.opportunityId}:${compId}`
@@ -138,17 +181,29 @@ function syncRecommendationsToReviewQueue(
           sourceUrl: rec.sourceUrl,
           sourceRecordId: rec.opportunityId,
           adapterType:
-            sourceId === 'SU-TED-001'
-              ? 'ted'
-              : sourceId === 'SU-EU-SEDIA-001'
-                ? 'eu-sedia'
-                : sourceId === 'SU-GEM-001'
-                  ? 'gem'
-                  : sourceId === 'SU-INDIA-GRANTS-001'
-                    ? 'india-grants'
-                    : sourceId === 'SU-WORLDBANK-001'
-                      ? 'worldbank'
-                      : 'grantsgov',
+            sourceId === 'SU-SAM-001'
+              ? 'sam'
+              : sourceId === 'SU-SBIR-001'
+                ? 'sbir'
+                : sourceId === 'SU-CHALLENGE-001'
+                  ? 'challenge'
+                  : sourceId === 'SU-STARTUP-INDIA-001'
+                    ? 'startup-india'
+                    : sourceId === 'SU-THUB-001'
+                      ? 'thub'
+                      : sourceId === 'SU-ICREATE-001'
+                        ? 'icreate'
+                        : sourceId === 'SU-TED-001'
+                          ? 'ted'
+                          : sourceId === 'SU-EU-SEDIA-001'
+                            ? 'eu-sedia'
+                            : sourceId === 'SU-GEM-001'
+                              ? 'gem'
+                              : sourceId === 'SU-INDIA-GRANTS-001'
+                                ? 'india-grants'
+                                : sourceId === 'SU-WORLDBANK-001'
+                                  ? 'worldbank'
+                                  : 'grantsgov',
           domain,
           accessState: 'AVAILABLE',
           queryTerm: null,
@@ -262,7 +317,7 @@ export default function TargetCompanyLiveDiscovery() {
 
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
-  const [discoveryScope, setDiscoveryScope] = useState<'all' | 'grants' | 'rfps' | 'india-grants' | 'india-rfps'>('all')
+  const [discoveryScope, setDiscoveryScope] = useState<'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps'>('all')
   const [viewMode, setViewMode] = useState<'cards' | 'matrix'>('cards')
   const [search, setSearch] = useState('')
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
@@ -399,6 +454,12 @@ export default function TargetCompanyLiveDiscovery() {
       const uniqueGemTerms = new Set<string>()
       const uniqueIndiaGrantsTerms = new Set<string>()
       const uniqueWorldBankTerms = new Set<string>()
+      const uniqueSamTerms = new Set<string>()
+      const uniqueSbirTerms = new Set<string>()
+      const uniqueChallengeTerms = new Set<string>()
+      const uniqueStartupIndiaTerms = new Set<string>()
+      const uniqueThubTerms = new Set<string>()
+      const uniqueIcreateTerms = new Set<string>()
 
       for (const profile of profiles) {
         const queries = buildCompanyDiscoveryQueries(profile)
@@ -409,16 +470,28 @@ export default function TargetCompanyLiveDiscovery() {
           if (discoveryScope === 'rfps' || discoveryScope === 'all') {
             uniqueTedTerms.add(trimmed)
             uniqueWorldBankTerms.add(trimmed)
+            uniqueSamTerms.add(trimmed)
           }
           if (discoveryScope === 'grants' || discoveryScope === 'all') {
             uniqueGrantsTerms.add(trimmed)
             uniqueEuTerms.add(trimmed)
+            uniqueSbirTerms.add(trimmed)
+            uniqueChallengeTerms.add(trimmed)
           }
-          if (discoveryScope === 'india-rfps' || discoveryScope === 'all') {
+          if (discoveryScope === 'india-rfps' || discoveryScope === 'india-all' || discoveryScope === 'all') {
             uniqueGemTerms.add(trimmed)
           }
-          if (discoveryScope === 'india-grants' || discoveryScope === 'all') {
+          if (discoveryScope === 'india-grants' || discoveryScope === 'india-all' || discoveryScope === 'all') {
             uniqueIndiaGrantsTerms.add(trimmed)
+            uniqueStartupIndiaTerms.add(trimmed)
+            uniqueThubTerms.add(trimmed)
+            uniqueIcreateTerms.add(trimmed)
+          }
+          if (discoveryScope === 'us-federal') {
+            uniqueSamTerms.add(trimmed)
+            uniqueSbirTerms.add(trimmed)
+            uniqueChallengeTerms.add(trimmed)
+            uniqueGrantsTerms.add(trimmed)
           }
         }
       }
@@ -764,6 +837,312 @@ export default function TargetCompanyLiveDiscovery() {
         return promise
       }
 
+      const samCache = new Map<string, Promise<SamBridgeSearchResponse>>()
+      const samRequester = (term: string): Promise<SamBridgeSearchResponse> => {
+        const key = term.trim().toLowerCase()
+        const cached = samCache.get(key)
+        if (cached) return cached
+        const promise: Promise<SamBridgeSearchResponse> = (async (): Promise<SamBridgeSearchResponse> => {
+          try {
+            const response = await fetch(resolveBridgeUrl(SAM_BRIDGE_SEARCH_PATH), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                runId: currentRunId,
+                companyId: 'target-discovery',
+                keyword: term.trim(),
+                limit: 100,
+                requestedAt: new Date().toISOString(),
+              }),
+            })
+            const rawText = await response.text()
+            let data: SamBridgeSearchResponse | null = null
+            try {
+              data = JSON.parse(rawText)
+            } catch {
+              return {
+                ok: false as const,
+                status: response.status || 502,
+                body: null,
+                errors: [{ code: 'invalid_response', message: `SAM.gov bridge returned HTTP ${response.status} with non-JSON response` }],
+              }
+            }
+            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
+              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
+              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
+                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'SAM.gov bridge request failed' }))
+                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from SAM.gov bridge` }]
+              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
+            }
+            return data
+          } catch (error) {
+            return {
+              ok: false as const,
+              status: 500,
+              body: null,
+              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
+            }
+          }
+        })()
+        samCache.set(key, promise)
+        return promise
+      }
+
+      const sbirCache = new Map<string, Promise<SbirBridgeSearchResponse>>()
+      const sbirRequester = (term: string): Promise<SbirBridgeSearchResponse> => {
+        const key = term.trim().toLowerCase()
+        const cached = sbirCache.get(key)
+        if (cached) return cached
+        const promise: Promise<SbirBridgeSearchResponse> = (async (): Promise<SbirBridgeSearchResponse> => {
+          try {
+            const response = await fetch(resolveBridgeUrl(SBIR_BRIDGE_SEARCH_PATH), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                runId: currentRunId,
+                companyId: 'target-discovery',
+                keyword: term.trim(),
+                limit: 100,
+                requestedAt: new Date().toISOString(),
+              }),
+            })
+            const rawText = await response.text()
+            let data: SbirBridgeSearchResponse | null = null
+            try {
+              data = JSON.parse(rawText)
+            } catch {
+              return {
+                ok: false as const,
+                status: response.status || 502,
+                body: null,
+                errors: [{ code: 'invalid_response', message: `SBIR.gov bridge returned HTTP ${response.status} with non-JSON response` }],
+              }
+            }
+            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
+              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
+              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
+                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'SBIR.gov bridge request failed' }))
+                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from SBIR.gov bridge` }]
+              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
+            }
+            return data
+          } catch (error) {
+            return {
+              ok: false as const,
+              status: 500,
+              body: null,
+              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
+            }
+          }
+        })()
+        sbirCache.set(key, promise)
+        return promise
+      }
+
+      const challengeCache = new Map<string, Promise<ChallengeBridgeSearchResponse>>()
+      const challengeRequester = (term: string): Promise<ChallengeBridgeSearchResponse> => {
+        const key = term.trim().toLowerCase()
+        const cached = challengeCache.get(key)
+        if (cached) return cached
+        const promise: Promise<ChallengeBridgeSearchResponse> = (async (): Promise<ChallengeBridgeSearchResponse> => {
+          try {
+            const response = await fetch(resolveBridgeUrl(CHALLENGE_BRIDGE_SEARCH_PATH), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                runId: currentRunId,
+                companyId: 'target-discovery',
+                keyword: term.trim(),
+                limit: 100,
+                requestedAt: new Date().toISOString(),
+              }),
+            })
+            const rawText = await response.text()
+            let data: ChallengeBridgeSearchResponse | null = null
+            try {
+              data = JSON.parse(rawText)
+            } catch {
+              return {
+                ok: false as const,
+                status: response.status || 502,
+                body: null,
+                errors: [{ code: 'invalid_response', message: `Challenge.gov bridge returned HTTP ${response.status} with non-JSON response` }],
+              }
+            }
+            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
+              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
+              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
+                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'Challenge.gov bridge request failed' }))
+                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from Challenge.gov bridge` }]
+              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
+            }
+            return data
+          } catch (error) {
+            return {
+              ok: false as const,
+              status: 500,
+              body: null,
+              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
+            }
+          }
+        })()
+        challengeCache.set(key, promise)
+        return promise
+      }
+
+      const startupIndiaCache = new Map<string, Promise<StartupIndiaBridgeSearchResponse>>()
+      const startupIndiaRequester = (term: string): Promise<StartupIndiaBridgeSearchResponse> => {
+        const key = term.trim().toLowerCase()
+        const cached = startupIndiaCache.get(key)
+        if (cached) return cached
+        const promise: Promise<StartupIndiaBridgeSearchResponse> = (async (): Promise<StartupIndiaBridgeSearchResponse> => {
+          try {
+            const response = await fetch(resolveBridgeUrl(STARTUP_INDIA_BRIDGE_SEARCH_PATH), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                runId: currentRunId,
+                companyId: 'target-discovery',
+                keyword: term.trim(),
+                limit: 100,
+                requestedAt: new Date().toISOString(),
+              }),
+            })
+            const rawText = await response.text()
+            let data: StartupIndiaBridgeSearchResponse | null = null
+            try {
+              data = JSON.parse(rawText)
+            } catch {
+              return {
+                ok: false as const,
+                status: response.status || 502,
+                body: null,
+                errors: [{ code: 'invalid_response', message: `Startup India bridge returned HTTP ${response.status} with non-JSON response` }],
+              }
+            }
+            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
+              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
+              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
+                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'Startup India bridge request failed' }))
+                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from Startup India bridge` }]
+              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
+            }
+            return data
+          } catch (error) {
+            return {
+              ok: false as const,
+              status: 500,
+              body: null,
+              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
+            }
+          }
+        })()
+        startupIndiaCache.set(key, promise)
+        return promise
+      }
+
+      const thubCache = new Map<string, Promise<ThubBridgeSearchResponse>>()
+      const thubRequester = (term: string): Promise<ThubBridgeSearchResponse> => {
+        const key = term.trim().toLowerCase()
+        const cached = thubCache.get(key)
+        if (cached) return cached
+        const promise: Promise<ThubBridgeSearchResponse> = (async (): Promise<ThubBridgeSearchResponse> => {
+          try {
+            const response = await fetch(resolveBridgeUrl(THUB_BRIDGE_SEARCH_PATH), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                runId: currentRunId,
+                companyId: 'target-discovery',
+                keyword: term.trim(),
+                limit: 100,
+                requestedAt: new Date().toISOString(),
+              }),
+            })
+            const rawText = await response.text()
+            let data: ThubBridgeSearchResponse | null = null
+            try {
+              data = JSON.parse(rawText)
+            } catch {
+              return {
+                ok: false as const,
+                status: response.status || 502,
+                body: null,
+                errors: [{ code: 'invalid_response', message: `T-Hub bridge returned HTTP ${response.status} with non-JSON response` }],
+              }
+            }
+            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
+              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
+              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
+                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'T-Hub bridge request failed' }))
+                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from T-Hub bridge` }]
+              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
+            }
+            return data
+          } catch (error) {
+            return {
+              ok: false as const,
+              status: 500,
+              body: null,
+              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
+            }
+          }
+        })()
+        thubCache.set(key, promise)
+        return promise
+      }
+
+      const icreateCache = new Map<string, Promise<IcreateBridgeSearchResponse>>()
+      const icreateRequester = (term: string): Promise<IcreateBridgeSearchResponse> => {
+        const key = term.trim().toLowerCase()
+        const cached = icreateCache.get(key)
+        if (cached) return cached
+        const promise: Promise<IcreateBridgeSearchResponse> = (async (): Promise<IcreateBridgeSearchResponse> => {
+          try {
+            const response = await fetch(resolveBridgeUrl(ICREATE_BRIDGE_SEARCH_PATH), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                runId: currentRunId,
+                companyId: 'target-discovery',
+                keyword: term.trim(),
+                limit: 100,
+                requestedAt: new Date().toISOString(),
+              }),
+            })
+            const rawText = await response.text()
+            let data: IcreateBridgeSearchResponse | null = null
+            try {
+              data = JSON.parse(rawText)
+            } catch {
+              return {
+                ok: false as const,
+                status: response.status || 502,
+                body: null,
+                errors: [{ code: 'invalid_response', message: `iCreate bridge returned HTTP ${response.status} with non-JSON response` }],
+              }
+            }
+            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
+              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
+              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
+                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'iCreate bridge request failed' }))
+                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from iCreate bridge` }]
+              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
+            }
+            return data
+          } catch (error) {
+            return {
+              ok: false as const,
+              status: 500,
+              body: null,
+              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
+            }
+          }
+        })()
+        icreateCache.set(key, promise)
+        return promise
+      }
+
       // Pre-warm unique searches:
       const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -803,29 +1182,104 @@ export default function TargetCompanyLiveDiscovery() {
         await delay(50)
       }
 
+      // 7. SAM.gov Federal Solicitations queries
+      for (const term of uniqueSamTerms) {
+        await samRequester(term)
+        await delay(50)
+      }
+
+      // 8. SBIR.gov Federal Innovation Grants queries
+      for (const term of uniqueSbirTerms) {
+        await sbirRequester(term)
+        await delay(50)
+      }
+
+      // 9. Challenge.gov Competitions queries
+      for (const term of uniqueChallengeTerms) {
+        await challengeRequester(term)
+        await delay(50)
+      }
+
+      // 10. Startup India Seed Fund queries
+      for (const term of uniqueStartupIndiaTerms) {
+        await startupIndiaRequester(term)
+        await delay(50)
+      }
+
+      // 11. T-Hub Innovation Accelerators queries
+      for (const term of uniqueThubTerms) {
+        await thubRequester(term)
+        await delay(50)
+      }
+
+      // 12. iCreate Prototyping Grants queries
+      for (const term of uniqueIcreateTerms) {
+        await icreateRequester(term)
+        await delay(50)
+      }
+
       const nextResults: TargetCompanyLiveDiscoveryResult[] = []
       for (const profile of profiles) {
-        if (discoveryScope === 'india-grants') {
+        if (discoveryScope === 'us-federal') {
+          const samRes = await runTargetCompanySamDiscovery(profile, samRequester)
+          const sbirRes = await runTargetCompanySbirDiscovery(profile, sbirRequester)
+          const challengeRes = await runTargetCompanyChallengeDiscovery(profile, challengeRequester)
+          const grantsRes = await runTargetCompanyGrantsGovDiscovery(profile, grantsRequester)
+          nextResults.push(mergeDiscoveryResults(profile, [samRes, sbirRes, challengeRes, grantsRes]))
+        } else if (discoveryScope === 'india-all') {
+          const gemRes = await runTargetCompanyGemDiscovery(profile, gemRequester)
+          const igRes = await runTargetCompanyIndiaGrantsDiscovery(profile, indiaGrantsRequester)
+          const siRes = await runTargetCompanyStartupIndiaDiscovery(profile, startupIndiaRequester)
+          const thubRes = await runTargetCompanyThubDiscovery(profile, thubRequester)
+          const icreateRes = await runTargetCompanyIcreateDiscovery(profile, icreateRequester)
+          nextResults.push(mergeDiscoveryResults(profile, [gemRes, igRes, siRes, thubRes, icreateRes]))
+        } else if (discoveryScope === 'india-grants') {
           const igResult = await runTargetCompanyIndiaGrantsDiscovery(profile, indiaGrantsRequester)
-          nextResults.push(igResult)
+          const siResult = await runTargetCompanyStartupIndiaDiscovery(profile, startupIndiaRequester)
+          const thubResult = await runTargetCompanyThubDiscovery(profile, thubRequester)
+          const icResult = await runTargetCompanyIcreateDiscovery(profile, icreateRequester)
+          nextResults.push(mergeDiscoveryResults(profile, [igResult, siResult, thubResult, icResult]))
         } else if (discoveryScope === 'india-rfps') {
           const gemResult = await runTargetCompanyGemDiscovery(profile, gemRequester)
           nextResults.push(gemResult)
         } else if (discoveryScope === 'rfps') {
           const tedResult = await runTargetCompanyTedDiscovery(profile, tedRequester)
           const wbResult = await runTargetCompanyWorldBankDiscovery(profile, worldBankRequester)
-          nextResults.push(mergeDiscoveryResults(profile, [tedResult, wbResult]))
+          const samResult = await runTargetCompanySamDiscovery(profile, samRequester)
+          nextResults.push(mergeDiscoveryResults(profile, [tedResult, wbResult, samResult]))
         } else if (discoveryScope === 'grants') {
           const grantsResult = await runTargetCompanyDiscovery(profile, grantsRequester, euRequester)
-          nextResults.push(grantsResult)
+          const sbirResult = await runTargetCompanySbirDiscovery(profile, sbirRequester)
+          const challengeResult = await runTargetCompanyChallengeDiscovery(profile, challengeRequester)
+          nextResults.push(mergeDiscoveryResults(profile, [grantsResult, sbirResult, challengeResult]))
         } else {
-          // 'all'
+          // 'all' — multi-source discovery across all 12 live systems!
           const grantsResult = await runTargetCompanyDiscovery(profile, grantsRequester, euRequester)
           const tedResult = await runTargetCompanyTedDiscovery(profile, tedRequester)
           const gemResult = await runTargetCompanyGemDiscovery(profile, gemRequester)
           const igResult = await runTargetCompanyIndiaGrantsDiscovery(profile, indiaGrantsRequester)
           const wbResult = await runTargetCompanyWorldBankDiscovery(profile, worldBankRequester)
-          nextResults.push(mergeDiscoveryResults(profile, [grantsResult, tedResult, gemResult, igResult, wbResult]))
+          const samResult = await runTargetCompanySamDiscovery(profile, samRequester)
+          const sbirResult = await runTargetCompanySbirDiscovery(profile, sbirRequester)
+          const challengeResult = await runTargetCompanyChallengeDiscovery(profile, challengeRequester)
+          const siResult = await runTargetCompanyStartupIndiaDiscovery(profile, startupIndiaRequester)
+          const thubResult = await runTargetCompanyThubDiscovery(profile, thubRequester)
+          const icreateResult = await runTargetCompanyIcreateDiscovery(profile, icreateRequester)
+          nextResults.push(
+            mergeDiscoveryResults(profile, [
+              grantsResult,
+              tedResult,
+              gemResult,
+              igResult,
+              wbResult,
+              samResult,
+              sbirResult,
+              challengeResult,
+              siResult,
+              thubResult,
+              icreateResult,
+            ])
+          )
         }
       }
       setResults(nextResults)
@@ -1006,7 +1460,7 @@ export default function TargetCompanyLiveDiscovery() {
               Target Company Live Discovery
             </h2>
             <p className="page__description" style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Automated multi-source search across Grants.gov, EU SEDIA, TED Procurement tenders, GeM (India), MeitY/iDEX Innovation Grants, and World Bank, matched against your {profiles.length} imported company profiles with explainable suitability scoring.
+              Automated multi-source search across 12 live systems (Grants.gov, SAM.gov, SBIR.gov, Challenge.gov, EU SEDIA, TED Procurement tenders, GeM &amp; CPPP, MeitY / iDEX, Startup India, T-Hub, iCreate, and World Bank), matched against your {profiles.length} imported company profiles with explainable suitability scoring.
             </p>
           </div>
           <span className="sn-tag sn-tag--accent" style={{ alignSelf: 'center', fontSize: '12px' }}>
@@ -1037,7 +1491,7 @@ export default function TargetCompanyLiveDiscovery() {
             {isEnriching ? '⚡ Crawling with Firecrawl...' : '⚡ Enrich with Firecrawl'}
           </button>
 
-          {/* Opportunity Scope Selector: Grants vs RFPs vs Both */}
+          {/* Opportunity Scope Selector */}
           <label
             htmlFor="discovery-scope-select"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}
@@ -1047,15 +1501,17 @@ export default function TargetCompanyLiveDiscovery() {
               id="discovery-scope-select"
               className="sn-select"
               value={discoveryScope}
-              onChange={(e) => setDiscoveryScope(e.target.value as 'all' | 'grants' | 'rfps' | 'india-grants' | 'india-rfps')}
+              onChange={(e) => setDiscoveryScope(e.target.value as 'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps')}
               disabled={running}
               aria-label="Opportunity Discovery Scope"
             >
-              <option value="all">All Opportunities (Global + India, Grants + RFPs Combined)</option>
-              <option value="grants">Grants &amp; Innovation Funding (Global: Grants.gov + EU SEDIA)</option>
-              <option value="rfps">RFPs &amp; Government Procurement (Global: TED EU + World Bank)</option>
-              <option value="india-grants">India Grants &amp; Innovation Schemes (MeitY, iDEX, Startup India, DST)</option>
+              <option value="all">All Opportunities (Global + US Federal + India All Combined)</option>
+              <option value="us-federal">US Federal Opportunities (SAM.gov RFPs + SBIR.gov Grants + Challenge.gov)</option>
+              <option value="india-all">All Indian Opportunities (GeM Tenders + MeitY + Startup India + T-Hub + iCreate)</option>
+              <option value="india-grants">India Innovation Grants (MeitY, iDEX, Startup India, T-Hub, iCreate)</option>
               <option value="india-rfps">India RFPs &amp; Public Tenders (GeM &amp; CPPP Central/State Govt)</option>
+              <option value="grants">Global Grants &amp; Innovation Funding (Grants.gov + EU SEDIA + SBIR.gov)</option>
+              <option value="rfps">Global RFPs &amp; Government Procurement (TED EU + World Bank + SAM.gov)</option>
             </select>
           </label>
 

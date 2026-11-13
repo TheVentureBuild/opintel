@@ -47,6 +47,24 @@ import type { IndiaGrantsBridgeSearchRequest } from '../src/live-source/india-gr
 import { handleWorldBankBridge } from '../src/live-source/worldbank-bridge/handler'
 import { WORLDBANK_BRIDGE_SEARCH_PATH } from '../src/live-source/worldbank-bridge/contract'
 import type { WorldBankBridgeSearchRequest } from '../src/live-source/worldbank-bridge/contract'
+import { handleSamBridge } from '../src/live-source/sam-bridge/handler'
+import { SAM_BRIDGE_SEARCH_PATH } from '../src/live-source/sam-bridge/contract'
+import type { SamBridgeSearchRequest } from '../src/live-source/sam-bridge/contract'
+import { handleSbirBridge } from '../src/live-source/sbir-bridge/handler'
+import { SBIR_BRIDGE_SEARCH_PATH } from '../src/live-source/sbir-bridge/contract'
+import type { SbirBridgeSearchRequest } from '../src/live-source/sbir-bridge/contract'
+import { handleChallengeBridge } from '../src/live-source/challenge-bridge/handler'
+import { CHALLENGE_BRIDGE_SEARCH_PATH } from '../src/live-source/challenge-bridge/contract'
+import type { ChallengeBridgeSearchRequest } from '../src/live-source/challenge-bridge/contract'
+import { handleStartupIndiaBridge } from '../src/live-source/startup-india-bridge/handler'
+import { STARTUP_INDIA_BRIDGE_SEARCH_PATH } from '../src/live-source/startup-india-bridge/contract'
+import type { StartupIndiaBridgeSearchRequest } from '../src/live-source/startup-india-bridge/contract'
+import { handleThubBridge } from '../src/live-source/thub-bridge/handler'
+import { THUB_BRIDGE_SEARCH_PATH } from '../src/live-source/thub-bridge/contract'
+import type { ThubBridgeSearchRequest } from '../src/live-source/thub-bridge/contract'
+import { handleIcreateBridge } from '../src/live-source/icreate-bridge/handler'
+import { ICREATE_BRIDGE_SEARCH_PATH } from '../src/live-source/icreate-bridge/contract'
+import type { IcreateBridgeSearchRequest } from '../src/live-source/icreate-bridge/contract'
 import { enrichTargetCompany, handleBatchCompanyEnrichment } from '../src/live-source/enrichment-bridge/handler'
 import {
   ENRICHMENT_BRIDGE_BATCH_PATH,
@@ -88,6 +106,12 @@ export function createProductionServer(config: HostConfig): ProductionHost {
       [GEM_BRIDGE_SEARCH_PATH]: (value) => handleGemBridge(value as GemBridgeSearchRequest | null),
       [INDIA_GRANTS_BRIDGE_SEARCH_PATH]: (value) => handleIndiaGrantsBridge(value as IndiaGrantsBridgeSearchRequest | null),
       [WORLDBANK_BRIDGE_SEARCH_PATH]: (value) => handleWorldBankBridge(value as WorldBankBridgeSearchRequest | null),
+      [SAM_BRIDGE_SEARCH_PATH]: (value) => handleSamBridge(value as SamBridgeSearchRequest | null),
+      [SBIR_BRIDGE_SEARCH_PATH]: (value) => handleSbirBridge(value as SbirBridgeSearchRequest | null),
+      [CHALLENGE_BRIDGE_SEARCH_PATH]: (value) => handleChallengeBridge(value as ChallengeBridgeSearchRequest | null),
+      [STARTUP_INDIA_BRIDGE_SEARCH_PATH]: (value) => handleStartupIndiaBridge(value as StartupIndiaBridgeSearchRequest | null),
+      [THUB_BRIDGE_SEARCH_PATH]: (value) => handleThubBridge(value as ThubBridgeSearchRequest | null),
+      [ICREATE_BRIDGE_SEARCH_PATH]: (value) => handleIcreateBridge(value as IcreateBridgeSearchRequest | null),
       [ENRICHMENT_BRIDGE_ENRICH_PATH]: async (value) => {
         const res = await enrichTargetCompany(value as CompanyEnrichmentRequest)
         return { httpStatus: res.status, body: res }

@@ -24,6 +24,12 @@ import { tvbGemBridge } from './src/live-source/gem-bridge/plugin'
 import { tvbIndiaGrantsBridge } from './src/live-source/india-grants-bridge/plugin'
 import { tvbWorldBankBridge } from './src/live-source/worldbank-bridge/plugin'
 import { tvbEnrichmentBridge } from './src/live-source/enrichment-bridge/plugin'
+import { tvbSamBridge } from './src/live-source/sam-bridge/plugin'
+import { tvbSbirBridge } from './src/live-source/sbir-bridge/plugin'
+import { tvbChallengeBridge } from './src/live-source/challenge-bridge/plugin'
+import { tvbStartupIndiaBridge } from './src/live-source/startup-india-bridge/plugin'
+import { tvbThubBridge } from './src/live-source/thub-bridge/plugin'
+import { tvbIcreateBridge } from './src/live-source/icreate-bridge/plugin'
 
 // Frontend-only prototype. No proxy, no external API. The Phase V vault
 // bridge is local middleware on the dev and preview servers
@@ -51,6 +57,12 @@ export default defineConfig({
     tvbIndiaGrantsBridge(),
     tvbWorldBankBridge(),
     tvbEnrichmentBridge(),
+    tvbSamBridge(),
+    tvbSbirBridge(),
+    tvbChallengeBridge(),
+    tvbStartupIndiaBridge(),
+    tvbThubBridge(),
+    tvbIcreateBridge(),
   ],
   server: {
     port: 5173,
