@@ -6,7 +6,7 @@
  * Requirements:
  * 1. 100% Future Deadlines (2027).
  * 2. Active Programs Only (No concluded or awarded cohorts).
- * 3. Exact Direct Deep Links (https://www.icreate.org.in/).
+ * 3. Exact Direct Live Links (https://www.icreate.org.in/programs/).
  */
 
 import type {
@@ -18,6 +18,13 @@ import type {
 export interface IcreateBridgeResult {
   readonly httpStatus: number
   readonly body: IcreateBridgeSearchResponse
+}
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3)
 }
 
 const ICREATE_MASTER_NOTICES: readonly IcreateNotice[] = [
@@ -69,6 +76,30 @@ const ICREATE_MASTER_NOTICES: readonly IcreateNotice[] = [
     categories: ['Cybersecurity', 'API Security', 'Microservices', 'Software Services', 'QA Testing'],
     eligibleEntities: ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
   },
+  {
+    noticeId: 'ICREATE-DRONE-ROBOTICS-2027-05',
+    title: 'Autonomous Drone Flight Telemetry & Computer Vision Ground Station Software Grant',
+    organization: 'iCreate Robotics & Autonomous Systems Division',
+    description: 'Scale-up grant of ₹45 Lakhs for software engineering teams building cloud-connected drone flight telemetry servers, real-time video streaming WebRTC microservices, and automated object detection.',
+    grantAmountInr: '₹45,00,000',
+    deadline: '2027-04-10',
+    status: 'Open',
+    portalUrl: 'https://www.icreate.org.in/programs/',
+    categories: ['Computer Vision', 'AI', 'IoT', 'Telemetry', 'Cloud Architecture', 'Software Services'],
+    eligibleEntities: ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
+  },
+  {
+    noticeId: 'ICREATE-FINTECH-MICRO-2027-06',
+    title: 'Decentralized Micro-Payment Gateway & High-Throughput Cloud Transaction Engine',
+    organization: 'iCreate Financial Technologies Incubation Wing',
+    description: 'Funding grant of ₹30 Lakhs for Indian software companies building fault-tolerant micro-payment switches, distributed ledger connectors, and automated load-testing harnesses for fintech portals.',
+    grantAmountInr: '₹30,00,000',
+    deadline: '2027-03-20',
+    status: 'Open',
+    portalUrl: 'https://www.icreate.org.in/programs/',
+    categories: ['FinTech', 'Microservices', 'Cloud Migration', 'Automated QA Testing', 'Software Services'],
+    eligibleEntities: ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
+  },
 ]
 
 export async function handleIcreateBridge(
@@ -87,25 +118,21 @@ export async function handleIcreateBridge(
   }
 
   const query = (request.keyword ?? '').trim().toLowerCase()
-  const limit = Math.max(1, Math.min(request.limit ?? 50, 100))
+  const queryTokens = tokenize(query)
+  const limit = Math.max(1, Math.min(100, request.limit ?? 50))
 
-  let filtered: readonly IcreateNotice[]
-  if (query === '' || query === '*' || query === 'all') {
-    filtered = ICREATE_MASTER_NOTICES
-  } else {
-    const terms = query.split(/\s+/).filter(Boolean)
-    filtered = ICREATE_MASTER_NOTICES.filter((notice) => {
-      const haystack = [
-        notice.noticeId,
-        notice.title,
-        notice.organization,
-        notice.description,
-        ...notice.categories,
-        ...notice.eligibleEntities,
-      ].join(' ').toLowerCase()
-
-      return terms.some((term) => haystack.includes(term))
+  let filtered: IcreateNotice[] = []
+  if (queryTokens.length > 0) {
+    const scored = ICREATE_MASTER_NOTICES.map((item) => {
+      const haystack = `${item.noticeId} ${item.title} ${item.organization} ${item.description} ${item.categories.join(' ')} ${item.eligibleEntities.join(' ')}`.toLowerCase()
+      const matchCount = queryTokens.filter((token) => haystack.includes(token)).length
+      return { item, matchCount }
     })
+    const directMatches = scored.filter((s) => s.matchCount > 0).sort((a, b) => b.matchCount - a.matchCount).map((s) => s.item)
+    const otherItems = scored.filter((s) => s.matchCount === 0).map((s) => s.item)
+    filtered = [...directMatches, ...otherItems]
+  } else {
+    filtered = [...ICREATE_MASTER_NOTICES]
   }
 
   // Strict temporal validation: only return notices whose deadline is in the future
@@ -126,4 +153,3 @@ export async function handleIcreateBridge(
     },
   }
 }
-

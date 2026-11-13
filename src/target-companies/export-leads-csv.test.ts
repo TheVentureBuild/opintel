@@ -277,10 +277,10 @@ test('buildOpportunityLeadRow maps the 6 new sources to exact issuers, geographi
     'Sathvika',
   )
   assert.equal(challengeRow[1], 'Grant')
-  assert.equal(challengeRow[3], 'US Federal Challenge Directorate (NIST / CMS / DHS)')
+  assert.equal(challengeRow[3], 'US Federal Challenge Directorate (NIST / CMS / DHS / DIU)')
   assert.equal(challengeRow[8], 'United States')
   assert.equal(challengeRow[11], 'USD')
-  assert.equal(challengeRow[15], 'Challenge.gov Open Competitions')
+  assert.equal(challengeRow[15], 'USA.gov & Federal Prize Challenges')
 
   // 4. Startup India
   const startupIndiaRow = buildOpportunityLeadRow(

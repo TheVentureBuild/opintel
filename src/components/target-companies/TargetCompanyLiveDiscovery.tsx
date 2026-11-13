@@ -421,8 +421,9 @@ export default function TargetCompanyLiveDiscovery() {
     return filteredGroups.slice(start, start + pageSize)
   }, [filteredGroups, safePage, pageSize])
 
-  const run = async () => {
+  const run = async (overrideScope?: 'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps') => {
     if (running || profiles.length === 0) return
+    const activeScope = overrideScope || discoveryScope
     setRunning(true)
     setRunError(null)
     try {
@@ -467,27 +468,27 @@ export default function TargetCompanyLiveDiscovery() {
         for (const term of terms) {
           const trimmed = term.trim()
           if (trimmed === '') continue
-          if (discoveryScope === 'rfps' || discoveryScope === 'all') {
+          if (activeScope === 'rfps' || activeScope === 'all') {
             uniqueTedTerms.add(trimmed)
             uniqueWorldBankTerms.add(trimmed)
             uniqueSamTerms.add(trimmed)
           }
-          if (discoveryScope === 'grants' || discoveryScope === 'all') {
+          if (activeScope === 'grants' || activeScope === 'all') {
             uniqueGrantsTerms.add(trimmed)
             uniqueEuTerms.add(trimmed)
             uniqueSbirTerms.add(trimmed)
             uniqueChallengeTerms.add(trimmed)
           }
-          if (discoveryScope === 'india-rfps' || discoveryScope === 'india-all' || discoveryScope === 'all') {
+          if (activeScope === 'india-rfps' || activeScope === 'india-all' || activeScope === 'all') {
             uniqueGemTerms.add(trimmed)
           }
-          if (discoveryScope === 'india-grants' || discoveryScope === 'india-all' || discoveryScope === 'all') {
+          if (activeScope === 'india-grants' || activeScope === 'india-all' || activeScope === 'all') {
             uniqueIndiaGrantsTerms.add(trimmed)
             uniqueStartupIndiaTerms.add(trimmed)
             uniqueThubTerms.add(trimmed)
             uniqueIcreateTerms.add(trimmed)
           }
-          if (discoveryScope === 'us-federal') {
+          if (activeScope === 'us-federal') {
             uniqueSamTerms.add(trimmed)
             uniqueSbirTerms.add(trimmed)
             uniqueChallengeTerms.add(trimmed)
@@ -1220,34 +1221,34 @@ export default function TargetCompanyLiveDiscovery() {
 
       const nextResults: TargetCompanyLiveDiscoveryResult[] = []
       for (const profile of profiles) {
-        if (discoveryScope === 'us-federal') {
+        if (activeScope === 'us-federal') {
           const samRes = await runTargetCompanySamDiscovery(profile, samRequester)
           const sbirRes = await runTargetCompanySbirDiscovery(profile, sbirRequester)
           const challengeRes = await runTargetCompanyChallengeDiscovery(profile, challengeRequester)
           const grantsRes = await runTargetCompanyGrantsGovDiscovery(profile, grantsRequester)
           nextResults.push(mergeDiscoveryResults(profile, [samRes, sbirRes, challengeRes, grantsRes]))
-        } else if (discoveryScope === 'india-all') {
+        } else if (activeScope === 'india-all') {
           const gemRes = await runTargetCompanyGemDiscovery(profile, gemRequester)
           const igRes = await runTargetCompanyIndiaGrantsDiscovery(profile, indiaGrantsRequester)
           const siRes = await runTargetCompanyStartupIndiaDiscovery(profile, startupIndiaRequester)
           const thubRes = await runTargetCompanyThubDiscovery(profile, thubRequester)
           const icreateRes = await runTargetCompanyIcreateDiscovery(profile, icreateRequester)
           nextResults.push(mergeDiscoveryResults(profile, [gemRes, igRes, siRes, thubRes, icreateRes]))
-        } else if (discoveryScope === 'india-grants') {
+        } else if (activeScope === 'india-grants') {
           const igResult = await runTargetCompanyIndiaGrantsDiscovery(profile, indiaGrantsRequester)
           const siResult = await runTargetCompanyStartupIndiaDiscovery(profile, startupIndiaRequester)
           const thubResult = await runTargetCompanyThubDiscovery(profile, thubRequester)
           const icResult = await runTargetCompanyIcreateDiscovery(profile, icreateRequester)
           nextResults.push(mergeDiscoveryResults(profile, [igResult, siResult, thubResult, icResult]))
-        } else if (discoveryScope === 'india-rfps') {
+        } else if (activeScope === 'india-rfps') {
           const gemResult = await runTargetCompanyGemDiscovery(profile, gemRequester)
           nextResults.push(gemResult)
-        } else if (discoveryScope === 'rfps') {
+        } else if (activeScope === 'rfps') {
           const tedResult = await runTargetCompanyTedDiscovery(profile, tedRequester)
           const wbResult = await runTargetCompanyWorldBankDiscovery(profile, worldBankRequester)
           const samResult = await runTargetCompanySamDiscovery(profile, samRequester)
           nextResults.push(mergeDiscoveryResults(profile, [tedResult, wbResult, samResult]))
-        } else if (discoveryScope === 'grants') {
+        } else if (activeScope === 'grants') {
           const grantsResult = await runTargetCompanyDiscovery(profile, grantsRequester, euRequester)
           const sbirResult = await runTargetCompanySbirDiscovery(profile, sbirRequester)
           const challengeResult = await runTargetCompanyChallengeDiscovery(profile, challengeRequester)
@@ -1304,7 +1305,7 @@ export default function TargetCompanyLiveDiscovery() {
         const srcResults = r.sourceResults ?? []
         return {
           companyId: compName,
-          domain: discoveryScope === 'rfps' || discoveryScope === 'india-rfps' ? 'procurement' : 'funding',
+          domain: activeScope === 'rfps' || activeScope === 'india-rfps' ? 'procurement' : 'funding',
           runId: currentRunId,
           requestedAt: runTime,
           completedAt: new Date().toISOString(),
@@ -1501,13 +1502,17 @@ export default function TargetCompanyLiveDiscovery() {
               id="discovery-scope-select"
               className="sn-select"
               value={discoveryScope}
-              onChange={(e) => setDiscoveryScope(e.target.value as 'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps')}
+              onChange={(e) => {
+                const nextScope = e.target.value as 'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps'
+                setDiscoveryScope(nextScope)
+                void run(nextScope)
+              }}
               disabled={running}
               aria-label="Opportunity Discovery Scope"
             >
               <option value="all">All Opportunities (Global + US Federal + India All Combined)</option>
-              <option value="us-federal">US Federal Opportunities (SAM.gov RFPs + SBIR.gov Grants + Challenge.gov)</option>
               <option value="india-all">All Indian Opportunities (GeM Tenders + MeitY + Startup India + T-Hub + iCreate)</option>
+              <option value="us-federal">US Federal Opportunities (SAM.gov RFPs + SBIR.gov Grants + USA.gov Challenges)</option>
               <option value="india-grants">India Innovation Grants (MeitY, iDEX, Startup India, T-Hub, iCreate)</option>
               <option value="india-rfps">India RFPs &amp; Public Tenders (GeM &amp; CPPP Central/State Govt)</option>
               <option value="grants">Global Grants &amp; Innovation Funding (Grants.gov + EU SEDIA + SBIR.gov)</option>

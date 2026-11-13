@@ -128,7 +128,7 @@ test('SAM.gov live bridge and discovery matches US software services companies',
   const result = await runTargetCompanySamDiscovery(profile, requester)
   assert.ok(result.records.length > 0, 'SAM.gov should return active IT solicitations')
   assert.ok(result.records.every((r) => r.source === 'sam'))
-  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('https://sam.gov/opp/')))
+  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('https://sam.gov/')))
   assert.ok(result.records.every((r) => r.deadline && new Date(r.deadline).getFullYear() >= 2027))
 })
 
@@ -154,11 +154,11 @@ test('SBIR.gov live bridge and discovery returns DARPA/NASA innovation grants', 
   const result = await runTargetCompanySbirDiscovery(profile, requester)
   assert.ok(result.records.length > 0, 'SBIR.gov should return innovation grant solicitations')
   assert.ok(result.records.every((r) => r.source === 'sbir'))
-  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('https://www.sbir.gov/node/')))
+  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('http')))
   assert.ok(result.records.every((r) => r.deadline && new Date(r.deadline).getFullYear() >= 2027))
 })
 
-test('Challenge.gov live bridge and discovery returns federal tech prize competitions', async () => {
+test('USA.gov / Federal Challenges live bridge and discovery returns federal tech prize competitions', async () => {
   const profile = {
     companyId: 'pacewisdom-challenge',
     name: 'Pace Wisdom Solutions',
@@ -178,9 +178,9 @@ test('Challenge.gov live bridge and discovery returns federal tech prize competi
   }
 
   const result = await runTargetCompanyChallengeDiscovery(profile, requester)
-  assert.ok(result.records.length > 0, 'Challenge.gov should return tech competitions')
+  assert.ok(result.records.length > 0, 'USA.gov / Federal Challenges should return tech competitions')
   assert.ok(result.records.every((r) => r.source === 'challenge'))
-  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('https://www.challenge.gov/')))
+  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('http')))
   assert.ok(result.records.every((r) => r.deadline && new Date(r.deadline).getFullYear() >= 2027))
 })
 

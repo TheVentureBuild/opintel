@@ -116,8 +116,14 @@ export function buildOpportunityLeadRow(
   const sourceHost = rec.sourceUrl.toLowerCase()
   const isGrantsGov = record?.source === 'grantsgov' || sourceHost.includes('grants.gov')
   const isSam = record?.source === 'sam' || sourceHost.includes('sam.gov')
-  const isSbir = record?.source === 'sbir' || sourceHost.includes('sbir.gov')
-  const isChallenge = record?.source === 'challenge' || sourceHost.includes('challenge.gov')
+  const isSbir = record?.source === 'sbir' || sourceHost.includes('sbir.gov') || sourceHost.includes('seed.nih.gov') || sourceHost.includes('sbir.nasa.gov')
+  const isChallenge =
+    record?.source === 'challenge' ||
+    sourceHost.includes('challenge.gov') ||
+    sourceHost.includes('usa.gov') ||
+    sourceHost.includes('diu.mil') ||
+    sourceHost.includes('darpa.mil') ||
+    sourceHost.includes('arpa-h.gov')
   const isTed = record?.source === 'ted' || sourceHost.includes('ted.europa.eu')
   const isEu = record?.source === 'eu-sedia' || sourceHost.includes('europa.eu')
   const isGem = record?.source === 'gem' || sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
@@ -138,7 +144,7 @@ export function buildOpportunityLeadRow(
       : isSbir
         ? 'SBIR.gov Innovation Grants'
         : isChallenge
-          ? 'Challenge.gov Open Competitions'
+          ? 'USA.gov & Federal Prize Challenges'
           : isStartupIndia
             ? 'Startup India Seed Fund Scheme'
             : isThub
@@ -162,7 +168,7 @@ export function buildOpportunityLeadRow(
     : isSbir
       ? 'US Federal SBIR / STTR Innovation Directorate'
       : isChallenge
-        ? 'US Federal Challenge Directorate (NIST / CMS / DHS)'
+        ? 'US Federal Challenge Directorate (NIST / CMS / DHS / DIU)'
         : isStartupIndia
           ? 'DPIIT & Central Ministries (Startup India)'
           : isThub
