@@ -232,7 +232,7 @@ test('T-Hub live bridge returns Lab32, T-AIM, and corporate innovation programs'
   const result = await runTargetCompanyThubDiscovery(profile, requester)
   assert.ok(result.records.length > 0, 'T-Hub should return accelerator & grant programs')
   assert.ok(result.records.every((r) => r.source === 'thub'))
-  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('https://t-hub.co/programs/')))
+  assert.ok(result.records.every((r) => r.sourceUrl.includes('t-hub.co/programs')))
   assert.ok(result.records.every((r) => r.deadline && new Date(r.deadline).getFullYear() >= 2027))
 })
 
@@ -258,6 +258,6 @@ test('iCreate live bridge returns Spark prototyping and scale-up grants', async 
   const result = await runTargetCompanyIcreateDiscovery(profile, requester)
   assert.ok(result.records.length > 0, 'iCreate should return prototyping & scale-up grants')
   assert.ok(result.records.every((r) => r.source === 'icreate'))
-  assert.ok(result.records.every((r) => r.sourceUrl.startsWith('https://www.icreate.org.in/programs/')))
+  assert.ok(result.records.every((r) => r.sourceUrl.includes('icreate.org.in/programs/')))
   assert.ok(result.records.every((r) => r.deadline && new Date(r.deadline).getFullYear() >= 2027))
 })

@@ -55,6 +55,7 @@ import { saveSuppliedReviewState } from '../../live-source/review-persistence'
 import { downloadLeadsCsv } from '../../target-companies/export-leads-csv'
 import MatchMatrix from './MatchMatrix'
 import LeadsDownloadMenu from './LeadsDownloadMenu'
+import { formatFriendlySourceName } from './match-matrix-model'
 import { requestCompanyEnrichment } from '../../target-companies/enrichment-store'
 
 const TARGET_RESULTS_KEY = 'tvb.target-company-results.v1'
@@ -119,17 +120,17 @@ function syncRecommendationsToReviewQueue(
                         ? 'SU-EU-SEDIA-001'
                         : sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
                           ? 'SU-GEM-001'
-                          : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('birac')
+                          : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('birac') || sourceHost.includes('bhashini') || sourceHost.includes('stpi') || sourceHost.includes('dst.gov') || sourceHost.includes('onlinedst') || sourceHost.includes('c2s.gov')
                             ? 'SU-INDIA-GRANTS-001'
                             : sourceHost.includes('worldbank.org')
                               ? 'SU-WORLDBANK-001'
                               : 'SU-LIVE-001'
       const sourceName = sourceHost.includes('sam.gov')
         ? 'SAM.gov Federal Solicitations'
-        : sourceHost.includes('sbir.gov')
+        : sourceHost.includes('sbir.gov') || sourceHost.includes('nasa.gov') || sourceHost.includes('nsf.gov') || sourceHost.includes('osti.gov')
           ? 'SBIR.gov Innovation Grants'
-          : sourceHost.includes('challenge.gov')
-            ? 'Challenge.gov Competitions'
+          : sourceHost.includes('challenge.gov') || sourceHost.includes('usa.gov') || sourceHost.includes('diu.mil') || sourceHost.includes('darpa.mil')
+            ? 'USA.gov & Federal Challenges'
             : sourceHost.includes('grants.gov')
               ? 'Grants.gov'
               : sourceHost.includes('seedfund.startupindia.gov.in') || sourceHost.includes('startupindia')
@@ -144,7 +145,7 @@ function syncRecommendationsToReviewQueue(
                         ? 'EU SEDIA'
                         : sourceHost.includes('gem.gov.in') || sourceHost.includes('eprocure.gov.in')
                           ? 'GeM & CPPP India'
-                          : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('birac')
+                          : sourceHost.includes('meity') || sourceHost.includes('idex') || sourceHost.includes('birac') || sourceHost.includes('bhashini') || sourceHost.includes('stpi') || sourceHost.includes('dst.gov') || sourceHost.includes('onlinedst') || sourceHost.includes('c2s.gov')
                             ? 'MeitY / iDEX Innovation Grants'
                             : sourceHost.includes('worldbank.org')
                               ? 'World Bank Procurement'
@@ -324,6 +325,7 @@ export default function TargetCompanyLiveDiscovery() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'funding' | 'procurement'>('all')
   const [outcomeFilter, setOutcomeFilter] = useState<string>('all')
   const [companyFilter, setCompanyFilter] = useState<string>('all')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'fit' | 'title' | 'deadline'>('fit')
   const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(0)
@@ -380,6 +382,14 @@ export default function TargetCompanyLiveDiscovery() {
     return Array.from(names).sort()
   }, [assessments])
 
+  const availableSources = useMemo(() => {
+    const set = new Set<string>()
+    opportunityGroups.forEach((g) => {
+      if (g.source) set.add(g.source)
+    })
+    return [...set].sort()
+  }, [opportunityGroups])
+
   const filteredGroups = useMemo(() => {
     const query = search.trim().toLowerCase()
     return opportunityGroups
@@ -387,10 +397,12 @@ export default function TargetCompanyLiveDiscovery() {
         if (typeFilter !== 'all' && group.opportunityType !== typeFilter) return false
         if (outcomeFilter !== 'all' && !group.assessments.some((a) => a.outcome === outcomeFilter)) return false
         if (companyFilter !== 'all' && !group.assessments.some((a) => a.companyName === companyFilter)) return false
+        if (sourceFilter !== 'all' && group.source !== sourceFilter) return false
         if (!query) return true
         return (
           group.opportunityTitle.toLowerCase().includes(query) ||
           group.source.toLowerCase().includes(query) ||
+          formatFriendlySourceName(group.source).toLowerCase().includes(query) ||
           group.assessments.some(
             (assessment) =>
               assessment.companyName.toLowerCase().includes(query) ||
@@ -412,7 +424,7 @@ export default function TargetCompanyLiveDiscovery() {
         const maxB = Math.max(...(b.assessments ?? []).map((item) => (typeof item?.score === 'number' ? item.score : 0)), 0)
         return maxB - maxA
       })
-  }, [opportunityGroups, search, typeFilter, outcomeFilter, companyFilter, sortBy])
+  }, [opportunityGroups, search, typeFilter, outcomeFilter, companyFilter, sourceFilter, sortBy])
 
   const totalPages = Math.max(1, Math.ceil(filteredGroups.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
@@ -1419,6 +1431,7 @@ export default function TargetCompanyLiveDiscovery() {
     setTypeFilter('all')
     setOutcomeFilter('all')
     setCompanyFilter('all')
+    setSourceFilter('all')
     setPage(0)
   }
 
@@ -1803,6 +1816,29 @@ export default function TargetCompanyLiveDiscovery() {
                 </label>
               ) : null}
 
+              {availableSources.length > 1 ? (
+                <label htmlFor="cards-source-filter" className="sn-filter-label">
+                  <span className="visually-hidden">Filter source</span>
+                  <select
+                    id="cards-source-filter"
+                    className="sn-select"
+                    aria-label="Filter source"
+                    value={sourceFilter}
+                    onChange={(e) => {
+                      setSourceFilter(e.target.value)
+                      setPage(0)
+                    }}
+                  >
+                    <option value="all">All Sources</option>
+                    {availableSources.map((s) => (
+                      <option key={s} value={s}>
+                        {formatFriendlySourceName(s)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
               <label htmlFor="sort-by-opportunity" className="sn-filter-label">
                 <span className="visually-hidden">Sort by</span>
                 <select
@@ -1856,7 +1892,7 @@ export default function TargetCompanyLiveDiscovery() {
                   idPrefix="toolbar"
                 />
               ) : null}
-              {(search || typeFilter !== 'all' || outcomeFilter !== 'all' || companyFilter !== 'all') ? (
+              {(search || typeFilter !== 'all' || outcomeFilter !== 'all' || companyFilter !== 'all' || sourceFilter !== 'all') ? (
                 <button type="button" className="btn btn--sm btn--outline" onClick={clearFilters}>
                   Clear Filters
                 </button>
@@ -1893,7 +1929,7 @@ export default function TargetCompanyLiveDiscovery() {
                         <span className="sn-tag sn-tag--accent">
                           {group.opportunityType === 'procurement' ? 'Procurement' : 'Funding'}
                         </span>
-                        <span className="sn-tag">{group.source}</span>
+                        <span className="sn-tag" title={group.source}>{formatFriendlySourceName(group.source)}</span>
                         {scoreDisplay ? (
                           <span className="sn-tag sn-tag--success" title="Highest suitability score across evaluated companies">
                             Fit: {scoreDisplay}
@@ -1904,7 +1940,7 @@ export default function TargetCompanyLiveDiscovery() {
 
                     <div className="sn-opportunity-card__meta">
                       <span>
-                        <strong>Source:</strong> {group.source} ·{' '}
+                        <strong>Source:</strong> {formatFriendlySourceName(group.source)} ({group.source}) ·{' '}
                         {firstAssessment?.sourceUrl ? (
                           <a href={firstAssessment.sourceUrl} target="_blank" rel="noreferrer">
                             {firstAssessment.sourceUrl}

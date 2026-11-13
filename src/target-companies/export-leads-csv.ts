@@ -134,7 +134,12 @@ export function buildOpportunityLeadRow(
     record?.source === 'india-grants' ||
     sourceHost.includes('meity') ||
     sourceHost.includes('idex') ||
-    sourceHost.includes('birac')
+    sourceHost.includes('birac') ||
+    sourceHost.includes('bhashini') ||
+    sourceHost.includes('stpi') ||
+    sourceHost.includes('dst.gov') ||
+    sourceHost.includes('onlinedst') ||
+    sourceHost.includes('c2s.gov')
   const isWorldBank = record?.source === 'worldbank' || sourceHost.includes('worldbank.org')
 
   const sourceName = isGrantsGov

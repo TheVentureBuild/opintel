@@ -29,7 +29,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2026-12-30',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'sme', 'small business', 'Pvt Ltd'],
     sectorFocus: ['Software Services', 'AI', 'Custom Web Applications', 'EdTech', 'Enterprise ERP', 'SaaS', 'Cloud'],
-    applicationUrl: 'https://www.myscheme.gov.in/schemes/samridh',
+    applicationUrl: 'https://msh.meity.gov.in/schemes/samridh',
     status: 'Open',
   },
   {
@@ -42,7 +42,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2027-02-28',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'sme', 'small business', 'Pvt Ltd'],
     sectorFocus: ['AI', 'Cloud Migration', 'Automated QA Testing', 'Software Services', 'HealthTech', 'IoT'],
-    applicationUrl: 'https://www.myscheme.gov.in/schemes/tide-2-0',
+    applicationUrl: 'https://msh.meity.gov.in/schemes/tide',
     status: 'Open',
   },
   {
@@ -96,7 +96,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2027-01-31',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'sme', 'small business', 'Pvt Ltd'],
     sectorFocus: ['Cybersecurity', 'Threat Detection', 'AI', 'Software Testing', 'Automated QA Testing'],
-    applicationUrl: 'https://www.myscheme.gov.in/schemes/idex',
+    applicationUrl: 'https://idex.gov.in/challenges',
     status: 'Open',
   },
   {
@@ -109,7 +109,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2027-03-31',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
     sectorFocus: ['AI', 'Computer Vision', 'Deep Learning', 'Edge AI', 'Software Services'],
-    applicationUrl: 'https://www.myscheme.gov.in/schemes/idex',
+    applicationUrl: 'https://idex.gov.in/challenges',
     status: 'Open',
   },
   {
@@ -122,7 +122,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2027-06-30',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
     sectorFocus: ['Software Services', 'GIS', 'AI', 'Cybersecurity', 'Autonomous Systems'],
-    applicationUrl: 'https://www.myscheme.gov.in/schemes/idex',
+    applicationUrl: 'https://idex.gov.in/challenges',
     status: 'Rolling',
   },
 
@@ -165,7 +165,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2027-01-15',
     eligibleEntityTypes: ['startup', 'commercial', 'for-profit', 'sme', 'innovator'],
     sectorFocus: ['AI', 'IoT', 'Software Services', 'Mobile Apps', 'HealthTech'],
-    applicationUrl: 'https://dst.gov.in/call-for-proposals',
+    applicationUrl: 'https://www.dst.gov.in/call-for-proposals',
     status: 'Open',
   },
   {
@@ -178,7 +178,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2027-03-31',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'Pvt Ltd'],
     sectorFocus: ['Software Services', 'AI', 'Cloud', 'Cybersecurity', 'FinTech'],
-    applicationUrl: 'https://dst.gov.in/call-for-proposals',
+    applicationUrl: 'https://onlinedst.gov.in/',
     status: 'Open',
   },
 
@@ -208,7 +208,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2026-12-31',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'Pvt Ltd'],
     sectorFocus: ['Software Services', 'Custom Web Applications', 'AI', 'EdTech', 'HealthTech'],
-    applicationUrl: 'https://stpi.in/',
+    applicationUrl: 'https://ngis.stpi.in/',
     status: 'Open',
   },
   {
@@ -221,7 +221,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: '2027-01-20',
     eligibleEntityTypes: ['commercial', 'for-profit', 'startup', 'sme', 'Pvt Ltd'],
     sectorFocus: ['FinTech', 'AI', 'Data Engineering', 'Cybersecurity', 'Software Services'],
-    applicationUrl: 'https://stpi.in/',
+    applicationUrl: 'https://finblue.stpi.in/',
     status: 'Open',
   },
 
@@ -348,7 +348,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-02-28",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Hardware","IoT","Embedded Software","Software Services","Robotics"],
-    applicationUrl: "https://www.myscheme.gov.in/schemes/c2s",
+    applicationUrl: "https://c2s.gov.in/",
     status: "Open",
   },
   {
@@ -374,7 +374,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-01-31",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Computer Vision","AR/VR","AI","Software Services","Mobile Apps"],
-    applicationUrl: "https://stpi.in/",
+    applicationUrl: "https://stpi.in/en",
     status: "Open",
   },
   {
@@ -387,7 +387,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-02-15",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["AI","Data Engineering","IoT","Software Services","Analytics"],
-    applicationUrl: "https://stpi.in/",
+    applicationUrl: "https://ngis.stpi.in/",
     status: "Open",
   },
   {
@@ -400,7 +400,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-03-10",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["FinTech","Software Services","Custom Web Applications","API Integration","Cloud"],
-    applicationUrl: "https://stpi.in/",
+    applicationUrl: "https://finblue.stpi.in/",
     status: "Open",
   },
   {
@@ -426,7 +426,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-02-28",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["AI","Computer Vision","Robotics","Embedded Software","Software Services"],
-    applicationUrl: "https://www.myscheme.gov.in/schemes/idex",
+    applicationUrl: "https://idex.gov.in/challenges",
     status: "Open",
   },
   {
@@ -439,7 +439,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-03-31",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Cybersecurity","Cryptography","Software Services","Cloud"],
-    applicationUrl: "https://www.myscheme.gov.in/schemes/idex",
+    applicationUrl: "https://idex.gov.in/challenges",
     status: "Open",
   },
   {
@@ -452,7 +452,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-03-15",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["GIS","Computer Vision","AI","Software Services","Remote Sensing"],
-    applicationUrl: "https://www.myscheme.gov.in/schemes/idex",
+    applicationUrl: "https://idex.gov.in/challenges",
     status: "Open",
   },
   {
@@ -465,7 +465,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-01-30",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Robotics","Embedded Software","AI","Software Services","GIS"],
-    applicationUrl: "https://www.myscheme.gov.in/schemes/idex",
+    applicationUrl: "https://idex.gov.in/challenges",
     status: "Open",
   },
   {
@@ -478,7 +478,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-02-15",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Telecom","Embedded Software","Software Testing","DSP","Software Services"],
-    applicationUrl: "https://www.myscheme.gov.in/schemes/idex",
+    applicationUrl: "https://idex.gov.in/challenges",
     status: "Open",
   },
   {
@@ -491,7 +491,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-01-25",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["AI","Cybersecurity","Telecom","Software Services","Signal Processing"],
-    applicationUrl: "https://www.myscheme.gov.in/schemes/idex",
+    applicationUrl: "https://idex.gov.in/challenges",
     status: "Open",
   },
   {
@@ -543,7 +543,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-02-15",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Software Services","AI","IoT","Hardware","Mobile Apps"],
-    applicationUrl: "https://dst.gov.in/call-for-proposals",
+    applicationUrl: "https://www.dst.gov.in/call-for-proposals",
     status: "Open",
   },
   {
@@ -556,7 +556,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-01-31",
     eligibleEntityTypes: ["commercial","for-profit","startup","Pvt Ltd"],
     sectorFocus: ["Software Services","AI","Custom Web Applications","Cloud"],
-    applicationUrl: "https://dst.gov.in/call-for-proposals",
+    applicationUrl: "https://www.dst.gov.in/call-for-proposals",
     status: "Open",
   },
   {
@@ -569,7 +569,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-03-31",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Software Services","Enterprise ERP","AI","Cloud Architecture","HealthTech"],
-    applicationUrl: "https://dst.gov.in/call-for-proposals",
+    applicationUrl: "https://www.dst.gov.in/call-for-proposals",
     status: "Open",
   },
   {
@@ -582,7 +582,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-04-30",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Quantum Computing","AI","Cybersecurity","Software Services","FinTech"],
-    applicationUrl: "https://dst.gov.in/call-for-proposals",
+    applicationUrl: "https://www.dst.gov.in/call-for-proposals",
     status: "Open",
   },
   {
@@ -595,7 +595,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-03-15",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Cyber-Physical Systems","IoT","AI","Software Services","Robotics"],
-    applicationUrl: "https://dst.gov.in/call-for-proposals",
+    applicationUrl: "https://www.dst.gov.in/call-for-proposals",
     status: "Open",
   },
   {
@@ -801,7 +801,7 @@ const INDIA_MASTER_GRANTS: readonly IndiaGrantOpportunity[] = [
     deadline: "2027-03-25",
     eligibleEntityTypes: ["commercial","for-profit","startup","sme","Pvt Ltd"],
     sectorFocus: ["Software Services","Cloud Architecture","Custom Web Applications","Enterprise ERP","AI"],
-    applicationUrl: "https://dst.gov.in/call-for-proposals",
+    applicationUrl: "https://www.dst.gov.in/call-for-proposals",
     status: "Open",
     state: "Gandhinagar / Ahmedabad, Gujarat",
   },

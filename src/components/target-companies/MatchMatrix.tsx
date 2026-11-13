@@ -5,6 +5,7 @@ import type { TargetRelevanceResult } from '../../target-companies/matching'
 import {
   buildMatrixRows,
   extractDistinctCompanies,
+  formatFriendlySourceName,
   outcomeBadgeClass,
   outcomeLabel,
 } from './match-matrix-model'
@@ -304,7 +305,7 @@ export default function MatchMatrix({
                 <option value="all">All Sources</option>
                 {availableSources.map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {formatFriendlySourceName(s)}
                   </option>
                 ))}
               </select>
@@ -512,7 +513,7 @@ export default function MatchMatrix({
                           <span className="sn-tag sn-tag--accent">
                             {row.opportunityType === 'procurement' ? 'Procurement' : 'Funding'}
                           </span>
-                          <span className="sn-tag">{row.source}</span>
+                          <span className="sn-tag" title={row.source}>{formatFriendlySourceName(row.source)}</span>
                           {row.deadline ? (
                             <span className="sn-matrix-opp-deadline" title="Submission deadline">
                               📅 {row.deadline}

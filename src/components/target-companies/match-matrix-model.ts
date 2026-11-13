@@ -284,3 +284,38 @@ export function sortMatrixRows(
     return a.opportunityTitle.localeCompare(b.opportunityTitle)
   })
 }
+
+/**
+ * Returns human-readable friendly source name from raw domain or source identifier.
+ */
+export function formatFriendlySourceName(rawSource: string): string {
+  if (!rawSource) return 'Public Source'
+  const s = rawSource.toLowerCase()
+  if (s.includes('startupindia')) return 'Startup India (DPIIT)'
+  if (s.includes('t-hub.co') || s.includes('t-hub')) return 'T-Hub (Telangana)'
+  if (s.includes('icreate.org.in') || s.includes('icreate')) return 'iCreate (DeepTech)'
+  if (s.includes('idex.gov.in') || s.includes('idex')) return 'iDEX (Defence Innovation)'
+  if (s.includes('msh.meity.gov.in') || s.includes('meity.gov.in')) return 'MeitY Startup Hub'
+  if (s.includes('bhashini.gov.in') || s.includes('bhashini')) return 'Bhashini Mission (MeitY)'
+  if (s.includes('ngis.stpi.in') || s.includes('chunauti')) return 'STPI CHUNAUTI / NGIS'
+  if (s.includes('finblue.stpi.in')) return 'STPI FinBlue CoE'
+  if (s.includes('stpi.in')) return 'STPI Directorate'
+  if (s.includes('onlinedst.gov.in') || s.includes('dst.gov.in')) return 'DST NIDHI / e-PMS'
+  if (s.includes('birac.nic.in')) return 'BIRAC (Biotech/Health)'
+  if (s.includes('c2s.gov.in') || s.includes('ism.gov.in')) return 'India Semiconductor Mission'
+  if (s.includes('bidplus.gem.gov.in')) return 'GeM India (bidplus.gem.gov.in)'
+  if (s.includes('eprocure.gov.in')) return 'CPPP India (eprocure.gov.in)'
+  if (s.includes('sam.gov')) return 'SAM.gov Federal Solicitations'
+  if (s.includes('sbir.gov')) return 'SBIR.gov Innovation Grants'
+  if (s.includes('nasa.gov')) return 'NASA SBIR/STTR'
+  if (s.includes('nsf.gov')) return 'NSF Seed Fund (SBIR)'
+  if (s.includes('osti.gov')) return 'DoE SBIR Track'
+  if (s.includes('usa.gov') || s.includes('challenges')) return 'USA.gov & Federal Challenges'
+  if (s.includes('diu.mil')) return 'DIU Commercial Solutions'
+  if (s.includes('darpa.mil')) return 'DARPA Opportunities'
+  if (s.includes('grants.gov')) return 'Grants.gov'
+  if (s.includes('ted.europa.eu')) return 'TED EU Procurement'
+  if (s.includes('europa.eu')) return 'EU Horizon / SEDIA'
+  if (s.includes('worldbank.org')) return 'World Bank Procurement'
+  return rawSource
+}
