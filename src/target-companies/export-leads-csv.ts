@@ -285,6 +285,61 @@ export function getLeadBatches(totalLeads: number, batchSize = 10): LeadBatchInf
 export interface GenerateLeadsCsvOptions {
   offset?: number
   limit?: number
+  filterType?: 'all' | 'grant' | 'rfp' | 'both_balanced'
+  diversifySources?: boolean
+}
+
+/**
+ * Selects lead rows ensuring source diversity (round-robin sampling across sources).
+ * Rather than allowing a single high-volume source to monopolize the top 10 rows,
+ * this algorithm picks the #1 top-scoring notice from each distinct source in turn,
+ * then the #2 from each source, until the limit is satisfied.
+ */
+export function selectDiverseLeadRows(
+  items: { score: number; row: string[] }[],
+  limit?: number,
+): string[][] {
+  if (items.length === 0) return []
+
+  // Group items by their source name (column index 15)
+  const bySource = new Map<string, { score: number; row: string[] }[]>()
+  for (const item of items) {
+    const src = item.row[15] || 'Other'
+    if (!bySource.has(src)) {
+      bySource.set(src, [])
+    }
+    bySource.get(src)!.push(item)
+  }
+
+  // Sort each source's items by score descending
+  for (const list of bySource.values()) {
+    list.sort((a, b) => b.score - a.score)
+  }
+
+  // Order source groups by their peak item score descending so highest-scoring sources get prioritized
+  const sortedSourceGroups = Array.from(bySource.entries())
+    .sort((a, b) => (b[1][0]?.score ?? 0) - (a[1][0]?.score ?? 0))
+    .map(([_, list]) => list)
+
+  const result: string[][] = []
+  let round = 0
+  let addedInRound = true
+
+  while (addedInRound && (typeof limit !== 'number' || result.length < limit)) {
+    addedInRound = false
+    for (const group of sortedSourceGroups) {
+      if (round < group.length) {
+        result.push(group[round].row)
+        addedInRound = true
+        if (typeof limit === 'number' && result.length >= limit) {
+          break
+        }
+      }
+    }
+    round++
+  }
+
+  return result
 }
 
 export function generateLeadsCsv(
@@ -325,11 +380,36 @@ export function generateLeadsCsv(
   // Sort by score descending (highest-fit leads first)
   leadRows.sort((a, b) => b.score - a.score)
 
-  let selectedRows = leadRows.map((item) => item.row)
-  if (typeof options?.offset === 'number' || typeof options?.limit === 'number') {
-    const start = options?.offset ?? 0
-    const end = typeof options?.limit === 'number' ? start + options.limit : undefined
-    selectedRows = selectedRows.slice(start, end)
+  let selectedRows: string[][]
+
+  if (options?.filterType === 'both_balanced') {
+    const grantItems = leadRows.filter((item) => item.row[1] === 'Grant')
+    const rfpItems = leadRows.filter((item) => item.row[1] === 'RFP')
+    const diverseGrants = selectDiverseLeadRows(grantItems, 10)
+    const diverseRfps = selectDiverseLeadRows(rfpItems, 10)
+    selectedRows = [...diverseGrants, ...diverseRfps]
+  } else if (options?.diversifySources) {
+    let candidates = leadRows
+    if (options.filterType === 'grant') {
+      candidates = candidates.filter((item) => item.row[1] === 'Grant')
+    } else if (options.filterType === 'rfp') {
+      candidates = candidates.filter((item) => item.row[1] === 'RFP')
+    }
+    selectedRows = selectDiverseLeadRows(candidates, options.limit)
+  } else {
+    let candidates = leadRows
+    if (options?.filterType === 'grant') {
+      candidates = candidates.filter((item) => item.row[1] === 'Grant')
+    } else if (options?.filterType === 'rfp') {
+      candidates = candidates.filter((item) => item.row[1] === 'RFP')
+    }
+    let rows = candidates.map((item) => item.row)
+    if (typeof options?.offset === 'number' || typeof options?.limit === 'number') {
+      const start = options?.offset ?? 0
+      const end = typeof options?.limit === 'number' ? start + options.limit : undefined
+      rows = rows.slice(start, end)
+    }
+    selectedRows = rows
   }
 
   const allRows: string[][] = [
@@ -355,6 +435,32 @@ export function countPotentialLeads(results: readonly TargetCompanyLiveDiscovery
     }
   }
   return count
+}
+
+export function countPotentialLeadsByType(results: readonly TargetCompanyLiveDiscoveryResult[]): {
+  grants: number
+  rfps: number
+  total: number
+} {
+  const seen = new Set<string>()
+  let grants = 0
+  let rfps = 0
+  for (const res of results) {
+    for (const rec of res.recommendations ?? []) {
+      if (isPotentialLead(rec)) {
+        const key = `${rec.opportunityId}:${rec.companyName}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          if (rec.opportunityType === 'procurement') {
+            rfps++
+          } else {
+            grants++
+          }
+        }
+      }
+    }
+  }
+  return { grants, rfps, total: grants + rfps }
 }
 
 export function triggerCsvDownload(csvContent: string, fileName: string): void {

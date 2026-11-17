@@ -3,6 +3,7 @@ import type { TargetCompanyLiveDiscoveryResult } from '../../target-companies/li
 import {
   downloadLeadsCsv,
   getLeadBatches,
+  countPotentialLeadsByType,
   type LeadBatchInfo,
 } from '../../target-companies/export-leads-csv'
 
@@ -28,6 +29,7 @@ export default function LeadsDownloadMenu({
 
   const batches: LeadBatchInfo[] = getLeadBatches(totalLeads, 10)
   const hasMultipleBatches = batches.length > 1
+  const counts = countPotentialLeadsByType(results)
 
   useEffect(() => {
     if (!isOpen) return
@@ -56,6 +58,34 @@ export default function LeadsDownloadMenu({
     setIsOpen(false)
   }
 
+  const handleDownloadDiverseGrants = () => {
+    downloadLeadsCsv(results, companyName, 'Sathvika', {
+      filterType: 'grant',
+      diversifySources: true,
+      limit: 10,
+      batchLabel: 'Top-10-Diverse-Grants',
+    })
+    setIsOpen(false)
+  }
+
+  const handleDownloadDiverseRfps = () => {
+    downloadLeadsCsv(results, companyName, 'Sathvika', {
+      filterType: 'rfp',
+      diversifySources: true,
+      limit: 10,
+      batchLabel: 'Top-10-Diverse-RFPs',
+    })
+    setIsOpen(false)
+  }
+
+  const handleDownloadBalancedTop20 = () => {
+    downloadLeadsCsv(results, companyName, 'Sathvika', {
+      filterType: 'both_balanced',
+      batchLabel: 'Balanced-Top-20-Grants-and-RFPs',
+    })
+    setIsOpen(false)
+  }
+
   const handleDownloadBatch = (batch: LeadBatchInfo) => {
     downloadLeadsCsv(results, companyName, 'Sathvika', {
       offset: batch.offset,
@@ -78,15 +108,9 @@ export default function LeadsDownloadMenu({
       <button
         type="button"
         id={`${idPrefix}-download-leads-btn`}
-        aria-haspopup={hasMultipleBatches ? 'true' : undefined}
-        aria-expanded={hasMultipleBatches ? isOpen : undefined}
-        onClick={() => {
-          if (hasMultipleBatches) {
-            setIsOpen((prev) => !prev)
-          } else {
-            handleDownloadAll()
-          }
-        }}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((prev) => !prev)}
         disabled={disabled}
         className={isPrimary ? 'btn btn--accent' : 'btn btn--sm'}
         style={
@@ -115,11 +139,7 @@ export default function LeadsDownloadMenu({
                 cursor: disabled ? 'not-allowed' : 'pointer',
               }
         }
-        title={
-          hasMultipleBatches
-            ? `Download leads (${totalLeads} total in batches of 10)`
-            : 'Download qualified leads as CSV matching RFP & Grant template'
-        }
+        title="Download qualified leads as CSV (Top 10 Grants, Top 10 RFPs, Balanced 20, or Batches)"
       >
         <span aria-hidden="true" style={{ fontSize: isPrimary ? '15px' : '13px' }}>
           📥
@@ -129,23 +149,21 @@ export default function LeadsDownloadMenu({
             ? `Download Leads CSV (${totalLeads})`
             : `Export Leads (${totalLeads})`}
         </span>
-        {hasMultipleBatches ? (
-          <span
-            aria-hidden="true"
-            style={{
-              fontSize: '11px',
-              marginLeft: '2px',
-              transition: 'transform 0.2s ease',
-              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
-          >
-            ▼
-          </span>
-        ) : null}
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: '11px',
+            marginLeft: '4px',
+            transition: 'transform 0.2s ease',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+        >
+          ▼
+        </span>
       </button>
 
-      {/* Dropdown Menu for Batches */}
-      {isOpen && hasMultipleBatches ? (
+      {/* Dropdown Menu */}
+      {isOpen ? (
         <div
           role="menu"
           aria-label="Lead download options"
@@ -154,16 +172,17 @@ export default function LeadsDownloadMenu({
             top: 'calc(100% + 6px)',
             left: 0,
             zIndex: 1000,
-            minWidth: '260px',
+            width: '320px',
             background: 'var(--surface, #ffffff)',
             border: '1px solid var(--border, rgba(0, 0, 0, 0.12))',
             borderRadius: 'var(--radius-lg, 10px)',
             boxShadow:
-              '0 12px 30px -4px rgba(0, 0, 0, 0.2), 0 6px 14px -3px rgba(0, 0, 0, 0.12)',
+              '0 16px 36px -4px rgba(0, 0, 0, 0.2), 0 8px 18px -3px rgba(0, 0, 0, 0.12)',
             padding: '8px',
             backdropFilter: 'blur(8px)',
           }}
         >
+          {/* Header */}
           <div
             style={{
               padding: '6px 10px 8px',
@@ -187,10 +206,187 @@ export default function LeadsDownloadMenu({
                 fontSize: '12px',
                 color: 'var(--text, #1e293b)',
                 marginTop: '2px',
+                display: 'flex',
+                justifyContent: 'space-between',
               }}
             >
-              {totalLeads} total leads by matching score
+              <span>{totalLeads} total leads</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted, #64748b)' }}>
+                {counts.grants} Grants • {counts.rfps} RFPs
+              </span>
             </div>
+          </div>
+
+          {/* Section: Recommended for Sheet */}
+          <div
+            style={{
+              padding: '4px 10px 4px',
+              fontSize: '10.5px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: '#059669',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>🌟</span>
+            <span>Recommended for Evaluation Sheet</span>
+          </div>
+
+          {/* Option: Balanced Top 20 (10 Grants + 10 RFPs) */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleDownloadBalancedTop20}
+            style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '8px 10px',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderRadius: '6px',
+              background: 'rgba(16, 185, 129, 0.06)',
+              color: 'var(--text, #1e293b)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 600,
+              textAlign: 'left',
+              marginBottom: '4px',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.14)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.06)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span>📊</span>
+                <span style={{ color: '#047857' }}>Balanced Top 20 (10 Grants + 10 RFPs)</span>
+              </span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  background: '#10b981',
+                  color: '#ffffff',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                }}
+              >
+                Top 20
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted, #64748b)', paddingLeft: '22px' }}>
+              Diverse round-robin across 16 sources (ideal for founder review)
+            </div>
+          </button>
+
+          {/* Option: Top 10 Diverse Grants */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleDownloadDiverseGrants}
+            style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '7px 10px',
+              border: 'none',
+              borderRadius: '6px',
+              background: 'transparent',
+              color: 'var(--text, #1e293b)',
+              cursor: 'pointer',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              textAlign: 'left',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--surface-2, rgba(0, 0, 0, 0.05))'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span>🎁</span>
+                <span>Top 10 Diverse Grants</span>
+              </span>
+              <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
+                {Math.min(10, counts.grants)} of {counts.grants}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted, #64748b)', paddingLeft: '22px' }}>
+              1 grant from each distinct portal (SBIR, Startup India, MeitY, T-Hub...)
+            </div>
+          </button>
+
+          {/* Option: Top 10 Diverse RFPs */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleDownloadDiverseRfps}
+            style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '7px 10px',
+              border: 'none',
+              borderRadius: '6px',
+              background: 'transparent',
+              color: 'var(--text, #1e293b)',
+              cursor: 'pointer',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              textAlign: 'left',
+              marginBottom: '4px',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--surface-2, rgba(0, 0, 0, 0.05))'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span>🏢</span>
+                <span>Top 10 Diverse RFPs</span>
+              </span>
+              <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 600 }}>
+                {Math.min(10, counts.rfps)} of {counts.rfps}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted, #64748b)', paddingLeft: '22px' }}>
+              1 RFP from each distinct portal (SAM.gov, GeM, World Bank, TED...)
+            </div>
+          </button>
+
+          {/* Divider: All & Raw Batches */}
+          <div
+            style={{
+              margin: '6px 0',
+              borderTop: '1px solid var(--border, rgba(0, 0, 0, 0.08))',
+              paddingTop: '6px',
+              paddingLeft: '10px',
+              fontSize: '10.5px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: 'var(--text-muted, #64748b)',
+            }}
+          >
+            All Qualified Leads (Unfiltered)
           </div>
 
           {/* Option: Download All */}
@@ -204,19 +400,19 @@ export default function LeadsDownloadMenu({
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '10px',
-              padding: '8px 10px',
+              padding: '7px 10px',
               border: 'none',
               borderRadius: '6px',
               background: 'transparent',
               color: 'var(--text, #1e293b)',
               cursor: 'pointer',
               fontSize: '13px',
-              fontWeight: 600,
+              fontWeight: 500,
               textAlign: 'left',
               transition: 'background 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--surface-2, rgba(16, 185, 129, 0.1))'
+              e.currentTarget.style.background = 'var(--surface-2, rgba(0, 0, 0, 0.05))'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent'
@@ -237,70 +433,72 @@ export default function LeadsDownloadMenu({
             </span>
           </button>
 
-          {/* Batch Divider */}
-          <div
-            style={{
-              margin: '6px 0',
-              borderTop: '1px solid var(--border, rgba(0, 0, 0, 0.08))',
-              paddingTop: '6px',
-              paddingLeft: '10px',
-              fontSize: '11px',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: 'var(--text-muted, #64748b)',
-            }}
-          >
-            Batches of 10
-          </div>
-
-          {/* Batches 1-10, 11-20, 21-30... */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {batches.map((batch) => (
-              <button
-                key={batch.batchIndex}
-                type="button"
-                role="menuitem"
-                onClick={() => handleDownloadBatch(batch)}
+          {/* Raw Batches of 10 if multiple batches */}
+          {hasMultipleBatches ? (
+            <>
+              <div
                 style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '10px',
-                  padding: '7px 10px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  background: 'transparent',
-                  color: 'var(--text, #1e293b)',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  textAlign: 'left',
-                  transition: 'background 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--surface-2, rgba(0, 0, 0, 0.05))'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent'
+                  margin: '4px 0',
+                  borderTop: '1px solid var(--border, rgba(0, 0, 0, 0.08))',
+                  paddingTop: '4px',
+                  paddingLeft: '10px',
+                  fontSize: '10.5px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--text-muted, #64748b)',
                 }}
               >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <span>📄</span>
-                  <span>{batch.label}</span>
-                </span>
-                <span
-                  style={{
-                    fontSize: '11.5px',
-                    color: 'var(--text-muted, #64748b)',
-                  }}
-                >
-                  {batch.limit} leads
-                </span>
-              </button>
-            ))}
-          </div>
+                Raw Score Batches (10 per file)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '160px', overflowY: 'auto' }}>
+                {batches.map((batch) => (
+                  <button
+                    key={batch.batchIndex}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleDownloadBatch(batch)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px',
+                      padding: '6px 10px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      background: 'transparent',
+                      color: 'var(--text, #1e293b)',
+                      cursor: 'pointer',
+                      fontSize: '12.5px',
+                      fontWeight: 500,
+                      textAlign: 'left',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--surface-2, rgba(0, 0, 0, 0.05))'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <span>📄</span>
+                      <span>{batch.label}</span>
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        color: 'var(--text-muted, #64748b)',
+                      }}
+                    >
+                      {batch.limit} leads
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
