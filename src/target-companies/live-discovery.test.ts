@@ -100,6 +100,9 @@ test('isOpportunityOpen enforces future deadlines and rejects conquered or award
   assert.equal(isOpportunityOpen('2027-12-31', 'Results of Tender'), false, 'Results of tender must be rejected')
   assert.equal(isOpportunityOpen('2027-12-31', 'Closed'), false, 'Closed must be rejected')
   assert.equal(isOpportunityOpen('2027-12-31', 'Archived'), false, 'Archived must be rejected')
+  assert.equal(isOpportunityOpen('2027-12-31', 'Active', undefined, 'Contract Award: Supply of IT Hardware'), false, 'Contract award in title must be rejected')
+  assert.equal(isOpportunityOpen('2027-12-31', 'Active', undefined, 'Supply of Software', 'can-standard'), false, 'can- notice type in TED must be rejected')
+  assert.equal(isOpportunityOpen('2027-12-31', 'Active', undefined, 'Notification of Award to Vendor'), false, 'Notification of award in title must be rejected')
 
   // 3. Accepts active future notices
   assert.equal(isOpportunityOpen('2027-06-30', 'Active'), true, 'Active 2027 notice must be accepted')

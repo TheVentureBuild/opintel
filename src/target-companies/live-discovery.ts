@@ -91,15 +91,28 @@ export function isOpportunityOpen(
   deadline: string | null | undefined,
   status: string | null | undefined,
   now = Date.now(),
+  title?: string | null | undefined,
+  noticeType?: string | null | undefined,
 ): boolean {
   const normalizedStatus = status?.trim().toLowerCase() ?? ''
+  const normalizedTitle = title?.trim().toLowerCase() ?? ''
+  const normalizedType = noticeType?.trim().toLowerCase() ?? ''
+
+  // 1. Strict rejection of awarded, conquered, closed, completed, cancelled, or past results notices
+  const awardRegex = /\b(closed|archived|expired|cancelled|canceled|awarded|conquered|winner|completed|decided)\b|\bcan-/i
+  const awardPhraseRegex = /contract award|award notice|results of tender|results of|notification of award|aoc\b|not open|no longer open|contract awarded|winner announced|award of contract/i
+
   if (
-    /\b(closed|archived|expired|cancelled|canceled|awarded|conquered|winner|completed|decided)\b/.test(normalizedStatus) ||
-    /contract award|award notice|results of|aoc\b|not open|no longer open/.test(normalizedStatus)
+    awardRegex.test(normalizedStatus) ||
+    awardPhraseRegex.test(normalizedStatus) ||
+    awardRegex.test(normalizedType) ||
+    awardPhraseRegex.test(normalizedType) ||
+    awardPhraseRegex.test(normalizedTitle)
   ) {
     return false
   }
 
+  // 2. Strict deadline evaluation
   const normalizedDeadline = deadline?.trim() ?? ''
   if (normalizedDeadline !== '') {
     const dateOnly = normalizedDeadline.match(/^(\d{4})-(\d{2})-(\d{2})(?:T00:00(?::00(?:\.0+)?)?Z)?$/)
@@ -109,7 +122,7 @@ export function isOpportunityOpen(
     return !Number.isNaN(dueAt.getTime()) && dueAt.getTime() >= now
   }
 
-  return /\b(open|active|ongoing|rolling)\b|\baccepting\s+(applications?|proposals?|bids?)\b/.test(normalizedStatus)
+  return /\b(open|active|ongoing|rolling|published)\b|\baccepting\s+(applications?|proposals?|bids?)\b/i.test(normalizedStatus)
 }
 
 export function grantsGovRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
@@ -367,7 +380,9 @@ export async function runTargetCompanyGrantsGovDiscovery(
     for (const error of parsed.errors) errors.push(error.message)
 
     const observedAt = new Date().toISOString()
-    const currentResults = parsed.results.filter((result) => isOpportunityOpen(result.deadline, result.sourceStatus))
+    const currentResults = parsed.results.filter((result) =>
+      isOpportunityOpen(result.deadline, result.sourceStatus, undefined, result.title, result.rawType),
+    )
     const adapterResult: AdapterResult = {
       status: 'SUCCESS',
       sourceId: 'SU-GRANTS-001',
@@ -465,7 +480,7 @@ export async function runTargetCompanyEuSediaDiscovery(
     })
     for (const error of parsed.errors) errors.push(error.message)
     for (const result of parsed.results) {
-      if (!isOpportunityOpen(result.deadline, result.sourceStatus)) continue
+      if (!isOpportunityOpen(result.deadline, result.sourceStatus, undefined, result.title, result.rawType)) continue
       const id = `eu-sedia:${result.sourceRecordId ?? result.sourceUrl}`
       if (!recordsById.has(id)) {
         recordsById.set(id, {
@@ -558,7 +573,7 @@ export async function runTargetCompanyTedDiscovery(
     })
     for (const error of parsed.errors) errors.push(error.message)
     for (const result of parsed.results) {
-      if (!isOpportunityOpen(result.deadline, result.sourceStatus)) continue
+      if (!isOpportunityOpen(result.deadline, result.sourceStatus, undefined, result.title, result.rawType)) continue
       const id = `ted:${result.sourceRecordId ?? result.sourceUrl}`
       if (!recordsById.has(id)) {
         recordsById.set(id, {
@@ -620,7 +635,7 @@ export async function runTargetCompanyGemDiscovery(
       const parsed = JSON.parse(response.body) as { tenders?: readonly GemNotice[] }
       const tenders = Array.isArray(parsed?.tenders) ? parsed.tenders : []
       for (const tender of tenders) {
-        if (!isOpportunityOpen(tender.deadline, tender.status)) continue
+        if (!isOpportunityOpen(tender.deadline, tender.status, undefined, tender.title)) continue
         const id = `gem:${tender.tenderId}`
         if (!recordsById.has(id)) {
           recordsById.set(id, {
@@ -692,7 +707,7 @@ export async function runTargetCompanyIndiaGrantsDiscovery(
       const parsed = JSON.parse(response.body) as { grants?: readonly IndiaGrantOpportunity[] }
       const grants = Array.isArray(parsed?.grants) ? parsed.grants : []
       for (const grant of grants) {
-        if (!isOpportunityOpen(grant.deadline, grant.status)) continue
+        if (!isOpportunityOpen(grant.deadline, grant.status, undefined, grant.title)) continue
         const id = `india-grants:${grant.grantId}`
         if (!recordsById.has(id)) {
           recordsById.set(id, {
@@ -764,7 +779,7 @@ export async function runTargetCompanyWorldBankDiscovery(
       const parsed = JSON.parse(response.body) as { notices?: readonly WorldBankNotice[] }
       const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
       for (const notice of notices) {
-        if (!isOpportunityOpen(notice.deadline, notice.status ?? 'Active')) continue
+        if (!isOpportunityOpen(notice.deadline, notice.status, undefined, notice.projectTitle, notice.noticeType)) continue
         const id = `worldbank:${notice.noticeId}`
         if (!recordsById.has(id)) {
           recordsById.set(id, {
@@ -836,7 +851,7 @@ export async function runTargetCompanySamDiscovery(
       const parsed = JSON.parse(response.body) as { notices?: readonly SamNotice[] }
       const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
       for (const notice of notices) {
-        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        if (!isOpportunityOpen(notice.deadline, notice.status, undefined, notice.title, notice.noticeType)) continue
         const id = `sam:${notice.noticeId}`
         if (!recordsById.has(id)) {
           recordsById.set(id, {
@@ -908,7 +923,7 @@ export async function runTargetCompanySbirDiscovery(
       const parsed = JSON.parse(response.body) as { notices?: readonly SbirNotice[] }
       const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
       for (const notice of notices) {
-        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        if (!isOpportunityOpen(notice.deadline, notice.status, undefined, notice.title)) continue
         const id = `sbir:${notice.topicId}`
         if (!recordsById.has(id)) {
           recordsById.set(id, {
@@ -980,7 +995,7 @@ export async function runTargetCompanyChallengeDiscovery(
       const parsed = JSON.parse(response.body) as { notices?: readonly ChallengeNotice[] }
       const notices = Array.isArray(parsed?.notices) ? parsed.notices : []
       for (const notice of notices) {
-        if (!isOpportunityOpen(notice.deadline, notice.status)) continue
+        if (!isOpportunityOpen(notice.deadline, notice.status, undefined, notice.title)) continue
         const id = `challenge:${notice.challengeId}`
         if (!recordsById.has(id)) {
           recordsById.set(id, {

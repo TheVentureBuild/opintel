@@ -259,6 +259,46 @@ export function evaluateTargetCompanyRelevance(
   company: TargetCompanyMatchInput,
   opportunity: TargetOpportunityInput,
 ): TargetRelevanceResult {
+  // Reject awarded, closed, expired, or past results from ever becoming leads
+  const oppStatus = (opportunity.status ?? '').trim().toLowerCase()
+  const oppTitle = (opportunity.title ?? '').trim().toLowerCase()
+  const isAwardedOrClosed =
+    /\b(closed|archived|expired|cancelled|canceled|awarded|conquered|winner|completed|decided)\b/i.test(oppStatus) ||
+    /contract award|award notice|results of tender|results of|notification of award|aoc\b|not open|no longer open/i.test(oppStatus) ||
+    /contract award|award notice|results of tender|notification of award|contract awarded|winner announced/i.test(oppTitle)
+
+  if (isAwardedOrClosed) {
+    return {
+      companyId: company.companyId || company.name,
+      companyName: company.name,
+      opportunityId: opportunity.opportunityId,
+      opportunityTitle: opportunity.title,
+      opportunityType: opportunity.opportunityType,
+      sourceUrl: opportunity.sourceUrl,
+      outcome: 'not_relevant',
+      score: 0,
+      scoreStatus: 'SCORED',
+      coverage: 1.0,
+      matchedFields: [],
+      mismatchedFields: ['status'],
+      missingFields: [],
+      reasons: ['Opportunity is an awarded contract, closed tender, or past result — not an open actionable lead.'],
+      uncertainty: [],
+      factors: {
+        industryAlignment: { score: 0, weight: 25, evidence: [], reason: 'Tender is awarded or closed.' },
+        capabilityAlignment: { score: 0, weight: 25, evidence: [], reason: 'Tender is awarded or closed.' },
+        useCaseAlignment: { score: 0, weight: 20, evidence: [], reason: 'Tender is awarded or closed.' },
+        applicantEligibility: { score: 0, weight: 15, evidence: [], reason: 'Tender is awarded or closed.' },
+        geography: { score: 0, weight: 10, evidence: [], reason: 'Tender is awarded or closed.' },
+        companyStage: { score: 0, weight: 5, evidence: [], reason: 'Tender is awarded or closed.' },
+      },
+      deadline: opportunity.deadline ?? null,
+      status: opportunity.status ?? 'Awarded / Closed',
+      topicalRelevance: 'unrelated',
+      applicantEligibilityStatus: 'ineligible',
+    }
+  }
+
   const matchedFields: string[] = []
   const mismatchedFields: string[] = []
   const missingFields: string[] = []

@@ -116,6 +116,17 @@ const WORLDBANK_MASTER_NOTICES: readonly WorldBankNotice[] = [
     noticeUrl: 'https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00311420',
     eligibleNationalities: 'Open to all World Bank member countries (including India, US, EU)',
   },
+  {
+    noticeId: 'OP00482077',
+    projectTitle: 'Design, Development, Deployment and Support of Data Controllers & Processors Registration Portal',
+    country: 'Eastern and Southern Africa',
+    sector: 'Information & Communications Technologies / Data Protection',
+    description: 'Request for Expression of Interest (REOI) for consulting firm to design, develop, deploy and support a centralized, secure regulatory portal for data controllers and processors under Data Protection Act (EA-RDIP Project P176181).',
+    deadline: '2026-12-01',
+    noticeType: 'Consultant Qualification Selection (CQS)',
+    noticeUrl: 'https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00482077',
+    eligibleNationalities: 'Open to all World Bank member countries (including India, US, EU; Joint Ventures permitted)',
+  },
 ]
 
 function tokenize(text: string): string[] {
@@ -159,16 +170,30 @@ export async function handleWorldBankBridge(
         const todayStr = new Date().toISOString().split('T')[0]
         for (const item of rawItems) {
           if (!item || !item.id) continue
-          const rawDeadline = item.submission_deadline_date ? item.submission_deadline_date.split('T')[0] : null
-          if (rawDeadline && rawDeadline < todayStr) continue // filter out past deadlines
+          const noticeType = (item.notice_type || item.procurement_method_name || '').trim().toLowerCase()
           const title = (item.bid_description || item.project_name || 'Procurement Notice').trim()
+          const desc = `${item.notice_type || 'Procurement'}: ${item.project_name || ''}. ${item.bid_description || ''}`
+
+          // Strictly filter out Contract Awards, Award Notices, and non-biddable past outcomes
+          if (
+            /\b(award|awarded|winner|cancelled|canceled|closed|conquered)\b/i.test(noticeType) ||
+            /contract award|award notice|results of tender|notification of award|aoc\b|contract awarded|winner announced/i.test(noticeType) ||
+            /contract award|award notice|results of tender|notification of award|contract awarded|winner announced/i.test(title)
+          ) {
+            continue // REJECT AWARDED NOTICES!
+          }
+
+          const rawDeadline = item.submission_deadline_date ? item.submission_deadline_date.split('T')[0] : null
+          if (!rawDeadline) continue // Without a genuine submission deadline, do NOT invent one!
+          if (rawDeadline < todayStr) continue // filter out past deadlines
+
           liveNotices.push({
             noticeId: item.id,
             projectTitle: title,
             country: item.project_ctry_name || 'International',
             sector: item.procurement_group || 'Information Technology',
-            description: `${item.notice_type || 'Procurement'}: ${item.project_name || ''}. ${item.bid_description || ''}`,
-            deadline: rawDeadline || '2027-02-15',
+            description: desc,
+            deadline: rawDeadline,
             noticeType: item.procurement_method_name || item.notice_type || 'Request for Bids (RFB)',
             noticeUrl: `https://projects.worldbank.org/en/projects-operations/procurement-detail/${item.id}`,
             eligibleNationalities: 'Open to all World Bank member countries (including India, US, EU)',
