@@ -61,7 +61,7 @@ import { reviewFixtureStore } from '../../automation/review-fixture'
 import type { DiscoveryCandidate } from '../../automation/candidate'
 import type { DiscoveryDomain } from '../../automation/types'
 import { saveSuppliedReviewState } from '../../live-source/review-persistence'
-import { downloadLeadsCsv } from '../../target-companies/export-leads-csv'
+import { downloadLeadsCsv, downloadCompanyLeadsMarkdown } from '../../target-companies/export-leads-csv'
 import MatchMatrix from './MatchMatrix'
 import LeadsDownloadMenu from './LeadsDownloadMenu'
 import { formatFriendlySourceName } from './match-matrix-model'
@@ -1484,14 +1484,35 @@ export default function TargetCompanyLiveDiscovery() {
           </label>
 
           {results.length > 0 && leads > 0 ? (
-            <LeadsDownloadMenu
-              results={results}
-              companyName={profiles[0]?.name}
-              totalLeads={leads}
-              disabled={running}
-              variant="primary"
-              idPrefix="action-bar"
-            />
+            <>
+              <LeadsDownloadMenu
+                results={results}
+                companyName={profiles[0]?.name}
+                totalLeads={leads}
+                disabled={running}
+                variant="primary"
+                idPrefix="action-bar"
+              />
+              <button
+                type="button"
+                id="action-bar-download-md-btn"
+                onClick={() => downloadCompanyLeadsMarkdown(results, profiles[0]?.name)}
+                disabled={running}
+                className="btn btn--outline"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                }}
+                title="Download complete company profile and qualified leads dossier as Markdown (.md)"
+              >
+                <span aria-hidden="true">📘</span>
+                <span>Export Dossier (.md)</span>
+              </button>
+            </>
           ) : null}
 
           {running ? <span role="status" style={{ fontSize: '13px', color: 'var(--accent)' }}>Searching live sources &amp; assessing fit...</span> : null}
@@ -2163,14 +2184,31 @@ export default function TargetCompanyLiveDiscovery() {
                 Collapse All
               </button>
               {leads > 0 ? (
-                <LeadsDownloadMenu
-                  results={results}
-                  companyName={profiles[0]?.name}
-                  totalLeads={leads}
-                  disabled={running}
-                  variant="toolbar"
-                  idPrefix="toolbar"
-                />
+                <>
+                  <LeadsDownloadMenu
+                    results={results}
+                    companyName={profiles[0]?.name}
+                    totalLeads={leads}
+                    disabled={running}
+                    variant="toolbar"
+                    idPrefix="toolbar"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => downloadCompanyLeadsMarkdown(results, profiles[0]?.name)}
+                    disabled={running}
+                    className="btn btn--sm btn--outline"
+                    title="Export complete company profile and qualified leads dossier as Markdown (.md)"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <span aria-hidden="true">📘</span>
+                    <span>.md Dossier</span>
+                  </button>
+                </>
               ) : null}
               {(search || typeFilter !== 'all' || outcomeFilter !== 'all' || companyFilter !== 'all' || sourceFilter !== 'all') ? (
                 <button type="button" className="btn btn--sm btn--outline" onClick={clearFilters}>

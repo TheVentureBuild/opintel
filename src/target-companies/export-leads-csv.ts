@@ -494,3 +494,22 @@ export function downloadLeadsCsv(
   const fileName = `${cleanName}-Opportunity-Leads${suffix}.csv`
   triggerCsvDownload(csvContent, fileName)
 }
+
+export {
+  generateCompanyLeadsMarkdown,
+  downloadCompanyLeadsMarkdown,
+  triggerMarkdownDownload,
+  type GenerateLeadsMarkdownOptions,
+} from './export-leads-markdown'
+
+import { downloadCompanyLeadsMarkdown } from './export-leads-markdown'
+
+export function downloadAllLeadFormats(
+  results: readonly TargetCompanyLiveDiscoveryResult[],
+  companyName?: string,
+  owner = 'Sathvika',
+  options?: DownloadLeadsCsvOptions,
+): void {
+  downloadLeadsCsv(results, companyName, owner, options)
+  downloadCompanyLeadsMarkdown(results, companyName, owner, options)
+}

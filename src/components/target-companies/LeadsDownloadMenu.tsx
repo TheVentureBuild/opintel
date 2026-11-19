@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { TargetCompanyLiveDiscoveryResult } from '../../target-companies/live-discovery'
 import {
   downloadLeadsCsv,
+  downloadCompanyLeadsMarkdown,
+  downloadAllLeadFormats,
   getLeadBatches,
   countPotentialLeadsByType,
   type LeadBatchInfo,
@@ -91,6 +93,27 @@ export default function LeadsDownloadMenu({
       offset: batch.offset,
       limit: batch.limit,
       batchLabel: `${batch.start}-to-${batch.end}`,
+    })
+    setIsOpen(false)
+  }
+
+  const handleDownloadMarkdownAll = () => {
+    downloadCompanyLeadsMarkdown(results, companyName)
+    setIsOpen(false)
+  }
+
+  const handleDownloadMarkdownTop20 = () => {
+    downloadCompanyLeadsMarkdown(results, companyName, 'Sathvika', {
+      filterType: 'both_balanced',
+      batchLabel: 'Balanced-Top-20-Dossier',
+    })
+    setIsOpen(false)
+  }
+
+  const handleDownloadBoth = () => {
+    downloadAllLeadFormats(results, companyName, 'Sathvika', {
+      filterType: 'both_balanced',
+      batchLabel: 'Balanced-Top-20',
     })
     setIsOpen(false)
   }
@@ -432,6 +455,157 @@ export default function LeadsDownloadMenu({
               All {totalLeads}
             </span>
           </button>
+
+          {/* Section: Markdown Dossier Export */}
+          <div
+            style={{
+              margin: '6px 0',
+              borderTop: '1px solid var(--border, rgba(0, 0, 0, 0.08))',
+              paddingTop: '6px',
+            }}
+          >
+            <div
+              style={{
+                padding: '4px 10px',
+                fontSize: '10.5px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: '#6366f1',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <span>📘</span>
+              <span>Company Dossier (.md)</span>
+            </div>
+
+            {/* Option: Download Full Company Dossier (.md) */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleDownloadMarkdownAll}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                padding: '7px 10px',
+                border: 'none',
+                borderRadius: '6px',
+                background: 'transparent',
+                color: 'var(--text, #1e293b)',
+                cursor: 'pointer',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                textAlign: 'left',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span>📄</span>
+                <span>Complete Company Dossier (.md)</span>
+              </span>
+              <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
+                .md
+              </span>
+            </button>
+
+            {/* Option: Top 20 Balanced Dossier (.md) */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleDownloadMarkdownTop20}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                padding: '7px 10px',
+                border: 'none',
+                borderRadius: '6px',
+                background: 'transparent',
+                color: 'var(--text, #1e293b)',
+                cursor: 'pointer',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                textAlign: 'left',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span>📊</span>
+                <span>Top 20 Balanced Dossier (.md)</span>
+              </span>
+              <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
+                Top 20
+              </span>
+            </button>
+
+            {/* Option: Download Both (.csv + .md) */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleDownloadBoth}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                padding: '7px 10px',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: '6px',
+                background: 'rgba(99, 102, 241, 0.06)',
+                color: 'var(--text, #1e293b)',
+                cursor: 'pointer',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                textAlign: 'left',
+                marginTop: '4px',
+                marginBottom: '4px',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.14)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.06)'
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span>📦</span>
+                <span style={{ color: '#4f46e5' }}>Download Bundle (.csv + .md)</span>
+              </span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  background: '#6366f1',
+                  color: '#ffffff',
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                }}
+              >
+                CSV + MD
+              </span>
+            </button>
+          </div>
 
           {/* Raw Batches of 10 if multiple batches */}
           {hasMultipleBatches ? (
