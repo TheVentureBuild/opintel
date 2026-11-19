@@ -214,7 +214,7 @@ export function worldBankRawToOpportunity(record: TargetCompanyLiveDiscoveryReco
     country: null,
     sectors: record.sectors ?? null,
     requirements: record.requirements ?? null,
-    applicantTypes: record.applicantTypes ?? ['commercial', 'for-profit'],
+    applicantTypes: record.applicantTypes ?? null,
     deadline: record.deadline,
     status: record.status,
     sourceUrl: record.sourceUrl,

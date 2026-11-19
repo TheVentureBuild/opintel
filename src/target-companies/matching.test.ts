@@ -485,3 +485,101 @@ test('company-opportunity evaluations remain completely independent across batch
   const chipramaBatchResult = batchResults.find((result) => result.companyId === CHIPRAMA.companyId)
   assert.deepEqual(singleResult, chipramaBatchResult)
 })
+
+// --- Phase 20 Real-World Calibration Tests for Enterprise IT Consultancies (e.g., Wissen Tech) ---
+
+const WISSEN_TECH = {
+  companyId: 'WISSEN-1',
+  name: 'Wissen Tech',
+  country: 'Bangalore, India and New Jersey, US',
+  sector: 'Software Services; financial services; healthcare; software development',
+  capabilities: ['financial reconciliation', 'banking API gateways', 'credit administration', 'regulatory portals', 'cloud migration', 'high-throughput microservices'],
+  description: 'Founded in 2000, Wissen Technology is an enterprise software consulting company specializing in low-latency systems, trade surveillance, banking API integrations, FHIR healthcare integrations, and financial compliance platforms.',
+  companyType: 'commercial',
+  foundedYear: 2000,
+}
+
+test('Wissen Tech: Georgia PACPS loan reconciliation & banking API RFP is a top-tier relevant match (>=85%)', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'OP00472679',
+      opportunityType: 'procurement',
+      title: 'Design, Development, Integration, Migration, Testing, Deployment, and Support of the Preferential Agro-Credit Project System (PACPS)',
+      description: 'Fully digital, centrally governed, and auditable basis. Core Case Management System, Transactional and Financial Reconciliation Module, API and Integration Layer, and Financial Institutions Portal with commercial banks.',
+      country: null,
+      sourceUrl: 'https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00472679',
+    },
+  )
+  assert.ok(result.outcome === 'relevant' || result.outcome === 'potentially_relevant')
+  assert.ok((result.score ?? 0) >= 80, `Score should be >= 80, got ${result.score}`)
+  assert.ok(result.matchedFields.includes('sector/capabilities'))
+})
+
+test('Wissen Tech: Somalia DPA Regulatory Compliance Portal is a strong match (>=70%)', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'OP00482077',
+      opportunityType: 'procurement',
+      title: 'Consulting Firm to Design, Develop, Deploy and Support the Data Controllers & Processors Registration and Complaint Management Portal (DRC Portal)',
+      description: 'Establish a centralized, secure regulatory portal to register data controllers and processors under Data Protection Act No. 005. Automate registration, certification, fee payment, and compliance workflows.',
+      country: null,
+      sourceUrl: 'https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00482077',
+    },
+  )
+  assert.ok(result.outcome === 'relevant' || result.outcome === 'potentially_relevant')
+  assert.ok((result.score ?? 0) >= 70, `Score should be >= 70, got ${result.score}`)
+})
+
+test('Wissen Tech: Ethiopia Data Center (chillers, FM200, UPS, raised floor, server supply) is rejected as hardware/civil knockout', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'OP00481028',
+      opportunityType: 'procurement',
+      title: 'Procurement of IT infrastructure for strengthening DHIS 2 Implementation and data warehouse',
+      description: 'Supply, installation, testing, commissioning of IT infrastructure: usable NVMe SAN, in-row cooling units, FM200 fire suppression gas, UPS systems 200 kVA, 1000A busbars, anti-static raised floor tiles, server racks, CCTV cameras, and manufacturer authorization form (MAF).',
+      country: null,
+      sourceUrl: 'https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00481028',
+    },
+  )
+  assert.equal(result.outcome, 'not_relevant')
+  assert.ok((result.score ?? 0) <= 10, `Score should be <= 10 for physical facilities/hardware, got ${result.score}`)
+  assert.ok(result.reasons.some((r) => /physical data center|hardware resale/i.test(r)))
+})
+
+test('Wissen Tech: USDA Forest Restoration Grant is rejected due to statutory applicant ineligibility and non-IT scope', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'USDA-FS-2026-LSR',
+      opportunityType: 'funding',
+      title: 'Landscape Scale Restoration Grant Program for Non-Federal Lands',
+      description: 'Restoration projects on rural non-industrial private forestland to reduce wildfire risk, improve fish and wildlife habitats, and mitigate invasive plants. Requires 1:1 match and State Forester sponsorship.',
+      applicantTypes: ['Nonprofits having a 501(c)(3) status', 'Higher Education', 'Native American tribal', 'State governments'],
+      country: 'US',
+      sourceUrl: 'https://grants.gov/usda-fs-2026-lsr',
+    },
+  )
+  assert.equal(result.outcome, 'not_relevant')
+  assert.equal(result.score, 0)
+  assert.equal(result.applicantEligibilityStatus, 'ineligible')
+  assert.ok(result.reasons.some((r) => /statutorily ineligible|forestry/i.test(r)))
+})
+
+test('Wissen Tech: Samoa National Retail Payment Switch Diagnostic Assessment is capped at advisory level (<=40%)', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'OP00481574',
+      opportunityType: 'procurement',
+      title: 'Diagnostic assessment for a National Retail Payment Switch',
+      description: 'Conduct a diagnostic assessment of retail payments ecosystem, evaluate feasibility of National Retail Payment Switch, gap analysis, stakeholder consultations, and draft technical blueprint and TOR for switch vendors.',
+      country: null,
+      sourceUrl: 'https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00481574',
+    },
+  )
+  assert.ok((result.score ?? 0) <= 40, `Advisory score should be capped <= 40, got ${result.score}`)
+  assert.ok(result.reasons.some((r) => /policy diagnostic|advisory/i.test(r)))
+})

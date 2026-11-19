@@ -109,6 +109,10 @@ const GENERIC_TERMS = new Set([
   'work', 'works', 'innovation', 'innovations', 'research', 'commercial',
   'technical', 'opportunity', 'opportunities', 'call', 'calls',
   'organization', 'organizations', 'industry', 'industries', 'hub', 'hubs',
+  'implementation', 'operations', 'monitoring', 'consulting', 'advisory',
+  'engineering', 'information', 'business', 'delivery', 'training',
+  'process', 'processing', 'testing', 'deployment', 'integration', 'enterprise',
+  'firm', 'firms', 'client', 'clients', 'center', 'centers', 'national', 'international',
 ])
 
 function normalize(value: string | null | undefined): string {
@@ -246,10 +250,15 @@ function opportunityAllTokens(opportunity: TargetOpportunityInput): string[] {
   ])]
 }
 
+function isSoftwareCompany(company: TargetCompanyMatchInput): boolean {
+  const text = `${company.sector ?? ''} ${company.description ?? ''} ${(company.capabilities ?? []).join(' ')} ${company.name ?? ''}`.toLowerCase()
+  return /software|technology|technologies|it services|digital|tech\b|computer|programming|developer|saas|fintech|cloud|semiconductor|asic|embedded/i.test(text)
+}
+
 function detectCompanyEntityCategory(company: TargetCompanyMatchInput): 'nonprofit' | 'for_profit' | 'higher_ed' | 'government' | null {
-  const typeText = `${company.companyType ?? ''} ${company.sector ?? ''} ${company.name ?? ''}`.toLowerCase()
-  if (/nonprofit|501\(c\)|research institute/i.test(typeText)) return 'nonprofit'
-  if (/higher education|university|universities|college/i.test(typeText)) return 'higher_ed'
+  const typeText = `${company.companyType ?? ''} ${company.sector ?? ''} ${company.name ?? ''} ${company.description ?? ''}`.toLowerCase()
+  if (/nonprofit|501\(c\)|charity|foundation|research institute/i.test(typeText)) return 'nonprofit'
+  if (/higher education|universit(y|ies)|college/i.test(typeText)) return 'higher_ed'
   if (/government|municipality|state agency/i.test(typeText)) return 'government'
   if (/for-profit|commercial|sme|small business|pvt\.? ltd|ltd|inc|corporation|technolog|software|services|startup/i.test(typeText)) return 'for_profit'
   return null
@@ -299,11 +308,152 @@ export function evaluateTargetCompanyRelevance(
     }
   }
 
+  const oppFullText = `${opportunity.title} ${opportunity.description ?? ''} ${(opportunity.requirements ?? []).join(' ')} ${(opportunity.sectors ?? []).join(' ')} ${(opportunity.applicantTypes ?? []).join(' ')}`.toLowerCase()
+  const companyCategory = detectCompanyEntityCategory(company)
+  const isSoftware = isSoftwareCompany(company)
+
+  // 1. Hardware, Physical Data Center Facilities & Mechanical/Electrical Knockout
+  const hardwareFacilitiesRegex = /\b(chiller|chillers|in-row cooling|crac\b|hvac\b|cooling unit|fm200|fire suppression|gas discharge|raised floor|anti-static floor|busbar|busbars|ups systems?|200 kva|1000a\b|power distribution frame|main distribution board|\bmdb\b|\bpdf\b|\bpdb\b|server cabinets|server racks|cctv|bullet cameras|dome cameras|\bnvr\b|biometric locks|magnetic locks|ic cards|office furniture|cable splicing|fiber splicing|hardware supply|box supply|maf if bidder != oem|manufacturer authorization form)\b/i
+  const isSoftwareDevelopmentRFP = /\b(custom software|portal development|software engineering|software development|api development|application software)\b/i.test(oppFullText)
+
+  if (isSoftware && hardwareFacilitiesRegex.test(oppFullText) && !isSoftwareDevelopmentRFP) {
+    return {
+      companyId: company.companyId || company.name,
+      companyName: company.name,
+      opportunityId: opportunity.opportunityId,
+      opportunityTitle: opportunity.title,
+      opportunityType: opportunity.opportunityType,
+      sourceUrl: opportunity.sourceUrl,
+      outcome: 'not_relevant',
+      score: 5,
+      scoreStatus: 'SCORED',
+      coverage: 1.0,
+      matchedFields: [],
+      mismatchedFields: ['sector/capabilities', 'scope'],
+      missingFields: [],
+      reasons: [
+        'Opportunity scope is primarily physical data center facility fit-out, electrical/mechanical infrastructure, or hardware resale (chillers, FM200, UPS, raised flooring, server supply) with OEM MAF requirements — out of scope for a software services consultancy.',
+      ],
+      uncertainty: [],
+      factors: {
+        industryAlignment: { score: 5, weight: 25, evidence: [], reason: 'Physical data center / electrical / hardware scope.' },
+        capabilityAlignment: { score: 5, weight: 25, evidence: [], reason: 'Hardware supply and physical facilities fit-out.' },
+        useCaseAlignment: { score: 0, weight: 20, evidence: [], reason: 'Civil and hardware infrastructure use case.' },
+        applicantEligibility: { score: 0, weight: 15, evidence: [], reason: 'Requires hardware OEM Manufacturer Authorization Form (MAF).' },
+        geography: { score: null, weight: 10, evidence: [], reason: 'Hardware delivery location.' },
+        companyStage: { score: null, weight: 5, evidence: [], reason: 'Hardware procurement.' },
+      },
+      deadline: opportunity.deadline ?? null,
+      status: opportunity.status ?? 'Active',
+      topicalRelevance: 'unrelated',
+      applicantEligibilityStatus: 'ineligible',
+    }
+  }
+
+  // 2. Environmental Fieldwork, Forestry, Wildlife & Civil Works Knockout
+  const fieldOperationsNonItRegex = /\b(wildfire|forest restoration|forestland|state forester|tree planting|timber|invasive plants|invasive insects|bark beetle|watershed restoration|fish habitat|wildlife habitat|stream restoration|landscape scale restoration|soil stabilization|rural non-industrial private forest|agricultural machinery|livestock|fertilizer|irrigation canal construction|asphalt resurfacing|pavement maintenance|bridge construction)\b/i
+
+  if (isSoftware && fieldOperationsNonItRegex.test(oppFullText) && !/\b(software development|custom software|data platform|ai model|api)\b/i.test(oppFullText)) {
+    return {
+      companyId: company.companyId || company.name,
+      companyName: company.name,
+      opportunityId: opportunity.opportunityId,
+      opportunityTitle: opportunity.title,
+      opportunityType: opportunity.opportunityType,
+      sourceUrl: opportunity.sourceUrl,
+      outcome: 'not_relevant',
+      score: 0,
+      scoreStatus: 'SCORED',
+      coverage: 1.0,
+      matchedFields: [],
+      mismatchedFields: ['sector/capabilities', 'scope'],
+      missingFields: [],
+      reasons: [
+        'Opportunity scope is physical environmental land management, forestry, agriculture, or civil infrastructure — completely outside the software and IT services domain.',
+      ],
+      uncertainty: [],
+      factors: {
+        industryAlignment: { score: 0, weight: 25, evidence: [], reason: 'Environmental / forestry / civil scope.' },
+        capabilityAlignment: { score: 0, weight: 25, evidence: [], reason: 'Physical land management or civil works.' },
+        useCaseAlignment: { score: 0, weight: 20, evidence: [], reason: 'Field operations / non-IT use case.' },
+        applicantEligibility: { score: 0, weight: 15, evidence: [], reason: 'Ineligible non-IT scope.' },
+        geography: { score: null, weight: 10, evidence: [], reason: 'Field project location.' },
+        companyStage: { score: null, weight: 5, evidence: [], reason: 'Field grant/contract.' },
+      },
+      deadline: opportunity.deadline ?? null,
+      status: opportunity.status ?? 'Active',
+      topicalRelevance: 'unrelated',
+      applicantEligibilityStatus: 'ineligible',
+    }
+  }
+
+  // 3. Statutory Applicant Ineligibility (Non-profit / Higher-Ed / Tribal / State government restricted)
+  const applicantTypesText = (opportunity.applicantTypes ?? []).join(' ').toLowerCase()
+  const hasStrictNonProfitRestriction =
+    (/\b(nonprofits? having a 501\(c\)\(3\)|nonprofits? that do not have|501\(c\)|higher education|universit(y|ies)|colleges?|state governments?|county governments?|city or township governments?|special district governments?|native american tribal|tribal organizations?)\b/i.test(applicantTypesText) ||
+      /\beligible applicants:.*?(nonprofit|501\(c\)|state government|higher education|tribal)/i.test(oppFullText)) &&
+    !/\b(for-profit|commercial|small business|sme|business|individuals?|unrestricted|open to any type of entity|any type of entity)\b/i.test(applicantTypesText || oppFullText)
+
+  if (companyCategory === 'for_profit' && hasStrictNonProfitRestriction) {
+    return {
+      companyId: company.companyId || company.name,
+      companyName: company.name,
+      opportunityId: opportunity.opportunityId,
+      opportunityTitle: opportunity.title,
+      opportunityType: opportunity.opportunityType,
+      sourceUrl: opportunity.sourceUrl,
+      outcome: 'not_relevant',
+      score: 0,
+      scoreStatus: 'SCORED',
+      coverage: 1.0,
+      matchedFields: [],
+      mismatchedFields: ['applicantType'],
+      missingFields: [],
+      reasons: [
+        'Commercial for-profit company is statutorily ineligible: opportunity is restricted to higher education institutions, universities, nonprofits (501(c)(3)), or government/tribal entities.',
+      ],
+      uncertainty: [],
+      factors: {
+        industryAlignment: { score: 0, weight: 25, evidence: [], reason: 'Ineligible applicant type.' },
+        capabilityAlignment: { score: 0, weight: 25, evidence: [], reason: 'Ineligible applicant type.' },
+        useCaseAlignment: { score: 0, weight: 20, evidence: [], reason: 'Ineligible applicant type.' },
+        applicantEligibility: { score: 0, weight: 15, evidence: [], reason: 'Restricted to nonprofits, higher education, or government entities.' },
+        geography: { score: null, weight: 10, evidence: [], reason: 'Not evaluated due to applicant ineligibility.' },
+        companyStage: { score: null, weight: 5, evidence: [], reason: 'Not evaluated due to applicant ineligibility.' },
+      },
+      deadline: opportunity.deadline ?? null,
+      status: opportunity.status ?? 'Active',
+      topicalRelevance: 'unrelated',
+      applicantEligibilityStatus: 'ineligible',
+    }
+  }
+
+  // 4. Pure Policy / Diagnostic Advisory Detection
+  const policyAndAdvisoryRegex = /\b(diagnostic assessment|feasibility study|gap analysis|implementation roadmap|draft rfp for vendors|terms of reference for switch vendors|review of legal and regulatory framework|stakeholder consultation plan|policy advisory|advisory services for national or regional payment systems)\b/i
+  const isPurePolicyAdvisory =
+    policyAndAdvisoryRegex.test(oppFullText) &&
+    !/\b(design, development, integration|software development|deploy and support|custom software|portal development|build and deploy|system implementation)\b/i.test(oppFullText)
+
+  // 5. Basic Physical Science / Nuclear / Deep Physics Detection
+  const isBasicScienceGrant =
+    /\b(continuation of solicitation for the office of science|basic energy sciences|fusion energy|high energy and nuclear physics|isotope r&d)\b/i.test(oppFullText)
+
   const matchedFields: string[] = []
   const mismatchedFields: string[] = []
   const missingFields: string[] = []
   const uncertainty: string[] = []
   const reasons: string[] = []
+
+  if (isPurePolicyAdvisory) {
+    reasons.push(
+      'Opportunity is a short-term policy diagnostic and feasibility study (advisory only). Drafting vendor specifications and RFPs under World Bank Conflict of Interest regulations may disqualify the firm from bidding on downstream software implementation.',
+    )
+  }
+  if (isBasicScienceGrant) {
+    reasons.push(
+      'Investigator-driven federal scientific research grant (not commercial IT procurement). Advanced Scientific Computing Research (ASCR) aligns with high-performance computing, but requires academic/national lab partnership and recognized research Principal Investigator (PI).',
+    )
+  }
 
   // 1. Geography evaluation
   const companyCountries = extractCountryCodes(
@@ -383,7 +533,6 @@ export function evaluateTargetCompanyRelevance(
 
   // 3. Applicant eligibility evaluation
   let applicantEligibilityStatus: TargetApplicantEligibility = 'unverified_unknown'
-  const companyCategory = detectCompanyEntityCategory(company)
 
   if (opportunity.applicantTypes && opportunity.applicantTypes.length > 0) {
     const oppTypesText = opportunity.applicantTypes.join(' ').toLowerCase()
@@ -617,8 +766,24 @@ export function evaluateTargetCompanyRelevance(
 
     if (topicalRelevance === 'unrelated' || mismatchedFields.includes('sector/capabilities')) {
       score = 0
+    } else if (topicalRelevance === 'weak_match') {
+      score = Math.min(rawScore, 35)
     } else if (applicantEligibilityStatus === 'ineligible') {
       score = Math.min(rawScore, 20)
+    } else if (isPurePolicyAdvisory) {
+      score = Math.min(rawScore, 40)
+      if (!reasons.some((r) => r.includes('policy diagnostic'))) {
+        reasons.push(
+          'Opportunity is a short-term policy diagnostic and feasibility study (advisory only). Drafting vendor specifications and RFPs under World Bank Conflict of Interest regulations may disqualify the firm from bidding on downstream software implementation.',
+        )
+      }
+    } else if (isBasicScienceGrant) {
+      score = Math.min(rawScore, 35)
+      if (!reasons.some((r) => r.includes('scientific research grant'))) {
+        reasons.push(
+          'Investigator-driven federal scientific research grant (not commercial IT procurement). Advanced Scientific Computing Research (ASCR) aligns with high-performance computing, but requires academic/national lab partnership and recognized research Principal Investigator (PI).',
+        )
+      }
     } else {
       score = rawScore
     }
