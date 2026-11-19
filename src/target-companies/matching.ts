@@ -312,6 +312,44 @@ export function evaluateTargetCompanyRelevance(
   const companyCategory = detectCompanyEntityCategory(company)
   const isSoftware = isSoftwareCompany(company)
 
+  // 0. Individual Consultant / Direct Employment Vacancy Knockout (Firms/Corporations Ineligible)
+  const individualConsultantRegex = /\b(individual consultant selection|individual consultants? \(ic\) method|individual consultant|hire an individual consultant|cs-indv|curriculum vitae with supporting certified copies|full-time position, renewable annually)\b/i
+  const isIndividualConsultantOpportunity = individualConsultantRegex.test(oppFullText) || /-cs-indv-/i.test(opportunity.opportunityId || '')
+
+  if (isIndividualConsultantOpportunity) {
+    return {
+      companyId: company.companyId || company.name,
+      companyName: company.name,
+      opportunityId: opportunity.opportunityId,
+      opportunityTitle: opportunity.title,
+      opportunityType: opportunity.opportunityType,
+      sourceUrl: opportunity.sourceUrl,
+      outcome: 'not_relevant',
+      score: 0,
+      scoreStatus: 'SCORED',
+      coverage: 1.0,
+      matchedFields: [],
+      mismatchedFields: ['applicantType'],
+      missingFields: [],
+      reasons: [
+        'Opportunity is an Individual Consultant (IC) recruitment / employment vacancy for a single person, not a corporate consulting RFP or software contract. Corporate entities and firms are statutorily ineligible to apply under the World Bank Individual Consultant selection method.',
+      ],
+      uncertainty: [],
+      factors: {
+        industryAlignment: { score: 0, weight: 25, evidence: [], reason: 'Individual staff recruitment / employment vacancy.' },
+        capabilityAlignment: { score: 0, weight: 25, evidence: [], reason: 'Individual staff recruitment / employment vacancy.' },
+        useCaseAlignment: { score: 0, weight: 20, evidence: [], reason: 'In-house project implementation unit employment.' },
+        applicantEligibility: { score: 0, weight: 15, evidence: [], reason: 'Restricted strictly to individual natural persons (firms/corporations ineligible).' },
+        geography: { score: null, weight: 10, evidence: [], reason: 'Individual post location.' },
+        companyStage: { score: null, weight: 5, evidence: [], reason: 'Individual post.' },
+      },
+      deadline: opportunity.deadline ?? null,
+      status: opportunity.status ?? 'Active',
+      topicalRelevance: 'unrelated',
+      applicantEligibilityStatus: 'ineligible',
+    }
+  }
+
   // 1. Hardware, Physical Data Center Facilities & Mechanical/Electrical Knockout
   const hardwareFacilitiesRegex = /\b(chiller|chillers|in-row cooling|crac\b|hvac\b|cooling unit|fm200|fire suppression|gas discharge|raised floor|anti-static floor|busbar|busbars|ups systems?|200 kva|1000a\b|power distribution frame|main distribution board|\bmdb\b|\bpdf\b|\bpdb\b|server cabinets|server racks|cctv|bullet cameras|dome cameras|\bnvr\b|biometric locks|magnetic locks|ic cards|office furniture|cable splicing|fiber splicing|hardware supply|box supply|maf if bidder != oem|manufacturer authorization form)\b/i
   const isSoftwareDevelopmentRFP = /\b(custom software|portal development|software engineering|software development|api development|application software)\b/i.test(oppFullText)

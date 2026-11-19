@@ -583,3 +583,21 @@ test('Wissen Tech: Samoa National Retail Payment Switch Diagnostic Assessment is
   assert.ok((result.score ?? 0) <= 40, `Advisory score should be capped <= 40, got ${result.score}`)
   assert.ok(result.reasons.some((r) => /policy diagnostic|advisory/i.test(r)))
 })
+
+test('Wissen Tech: Saint Lucia Finance Officer Individual Consultant notice is rejected (0%)', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'OP00480911',
+      opportunityType: 'procurement',
+      title: 'FINANCE OFFICER - Unleashing the Blue Economy of the Caribbean (UBEC)',
+      description: 'Saint Lucia has received financing to hire an Individual Consultant as Finance Officer UBEC. Full-time position, renewable annually. Procurement Method: Individual Consultant Selection. Reference No. LC-MOFED-571341-CS-INDV-FO-26-2.',
+      country: null,
+      sourceUrl: 'https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00480911',
+    },
+  )
+  assert.equal(result.outcome, 'not_relevant')
+  assert.equal(result.score, 0)
+  assert.equal(result.applicantEligibilityStatus, 'ineligible')
+  assert.ok(result.reasons.some((r) => /Individual Consultant|employment vacancy/i.test(r)))
+})
