@@ -422,14 +422,19 @@ export function evaluateTargetCompanyRelevance(
     outcome = 'not_relevant'
   }
 
-  // 5. Factor scoring
+  // 5. Factor scoring with dynamic title & capability depth evaluation
+  const cSpecific = cAll.filter((token) => !GENERIC_TERMS.has(token))
+  const titleLower = opportunity.title.toLowerCase()
+  const titleMatches = cSpecific.filter((token) => titleLower.includes(token))
+  const hasTitleMatch = titleMatches.length > 0
+
   const industryAlignment: TargetRelevanceFactor = {
     score: cAll.length === 0 || oAll.length === 0
       ? null
       : specificSharedSector.length >= 2
         ? 100
         : specificSharedSector.length === 1
-          ? 75
+          ? (hasTitleMatch ? 85 : 75)
           : specificAllShared.length >= 1
             ? 50
             : sharedAll.length > 0
@@ -447,15 +452,17 @@ export function evaluateTargetCompanyRelevance(
   const capabilityAlignment: TargetRelevanceFactor = {
     score: cAll.length === 0 || oAll.length === 0
       ? null
-      : specificSharedCap.length >= 2
+      : specificSharedCap.length >= 3
         ? 100
-        : specificSharedCap.length === 1
-          ? 75
-          : specificAllShared.length >= 1
-            ? 50
-            : sharedAll.length > 0
-              ? 15
-              : 0,
+        : specificSharedCap.length === 2
+          ? 90
+          : specificSharedCap.length === 1
+            ? (hasTitleMatch ? 82 : 72)
+            : specificAllShared.length >= 1
+              ? 50
+              : sharedAll.length > 0
+                ? 15
+                : 0,
     weight: 25,
     evidence: specificSharedCap.length > 0 ? specificSharedCap.slice(0, 5) : sharedCap.slice(0, 5),
     reason: specificSharedCap.length > 0
@@ -466,11 +473,15 @@ export function evaluateTargetCompanyRelevance(
   }
 
   const useCaseAlignment: TargetRelevanceFactor = {
-    score: cAll.length > 0 && oAll.length > 0 && specificAllShared.length >= 2 ? 75 : null,
+    score: cAll.length > 0 && oAll.length > 0 && specificAllShared.length >= 2
+      ? Math.min(100, 70 + specificAllShared.length * 4 + (hasTitleMatch ? 12 : 0))
+      : specificAllShared.length === 1
+        ? (hasTitleMatch ? 65 : 45)
+        : null,
     weight: 20,
     evidence: specificAllShared.length >= 2 ? specificAllShared.slice(0, 3) : [],
     reason: specificAllShared.length >= 2
-      ? 'Use-case scope aligned with profile description.'
+      ? (hasTitleMatch ? 'Title and use-case scope directly align with profile.' : 'Use-case scope aligned with profile description.')
       : 'Use-case alignment is not yet evidenced by structured data.',
   }
 

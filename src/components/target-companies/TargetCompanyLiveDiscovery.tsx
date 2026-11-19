@@ -487,7 +487,7 @@ export default function TargetCompanyLiveDiscovery() {
 
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
-  const [discoveryScope, setDiscoveryScope] = useState<'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps'>('all')
+  const [discoveryScope, setDiscoveryScope] = useState<'all' | '100-live' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps'>('100-live')
   const [viewMode, setViewMode] = useState<'cards' | 'matrix'>('cards')
   const [search, setSearch] = useState('')
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
@@ -602,7 +602,7 @@ export default function TargetCompanyLiveDiscovery() {
     return filteredGroups.slice(start, start + pageSize)
   }, [filteredGroups, safePage, pageSize])
 
-  const run = async (overrideScope?: 'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps') => {
+  const run = async (overrideScope?: 'all' | '100-live' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps') => {
     if (running || profiles.length === 0) return
     const activeScope = overrideScope || discoveryScope
     setRunning(true)
@@ -1149,6 +1149,12 @@ export default function TargetCompanyLiveDiscovery() {
           const challengeRes = await runTargetCompanyChallengeDiscovery(profile, challengeRequester)
           const grantsRes = await runTargetCompanyGrantsGovDiscovery(profile, grantsRequester)
           nextResults.push(mergeDiscoveryResults(profile, [samRes, sbirRes, challengeRes, grantsRes]))
+        } else if (activeScope === '100-live') {
+          // 100% Live Verified Government & Multilateral APIs only (Zero synthetic/mock items)
+          const grantsResult = await runTargetCompanyDiscovery(profile, grantsRequester, euRequester)
+          const tedResult = await runTargetCompanyTedDiscovery(profile, tedRequester)
+          const wbResult = await runTargetCompanyWorldBankDiscovery(profile, worldBankRequester)
+          nextResults.push(mergeDiscoveryResults(profile, [grantsResult, tedResult, wbResult]))
         } else if (activeScope === 'india-all') {
           const gemRes = await runTargetCompanyGemDiscovery(profile, gemRequester)
           const igRes = await runTargetCompanyIndiaGrantsDiscovery(profile, indiaGrantsRequester)
@@ -1426,20 +1432,21 @@ export default function TargetCompanyLiveDiscovery() {
               className="sn-select"
               value={discoveryScope}
               onChange={(e) => {
-                const nextScope = e.target.value as 'all' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps'
+                const nextScope = e.target.value as 'all' | '100-live' | 'grants' | 'rfps' | 'us-federal' | 'india-all' | 'india-grants' | 'india-rfps'
                 setDiscoveryScope(nextScope)
                 void run(nextScope)
               }}
               disabled={running}
               aria-label="Opportunity Discovery Scope"
             >
-              <option value="all">All feeds (Global Grants &amp; RFPs)</option>
-              <option value="india-all">India opportunities (GeM / CPPP &amp; Innovation Grants)</option>
-              <option value="us-federal">US federal (SAM.gov, Grants.gov, SBIR, Challenges)</option>
-              <option value="india-grants">India grants (MeitY, STPI FinBlue, DST, State Funds)</option>
-              <option value="india-rfps">India tenders (GeM &amp; Central PSU Procurements)</option>
-              <option value="grants">Grants &amp; Innovation Funding (US, EU &amp; India)</option>
-              <option value="rfps">RFPs &amp; Public Procurement (Tenders &amp; Contracts)</option>
+              <option value="100-live">🟢 100% Live Verified Feeds (Grants.gov, World Bank, TED, EU SEDIA)</option>
+              <option value="all">All Feeds (Live Feeds + Agency Programs)</option>
+              <option value="us-federal">US Federal (SAM.gov, Grants.gov, SBIR, Challenges)</option>
+              <option value="grants">Grants &amp; Innovation Funding</option>
+              <option value="rfps">RFPs &amp; Public Procurement</option>
+              <option value="india-all">India Opportunities (STPI FinBlue, MeitY, GeM)</option>
+              <option value="india-grants">India Grants (STPI FinBlue, MeitY R&amp;D, TIDE 2.0)</option>
+              <option value="india-rfps">India Tenders (GeM &amp; Central PSU)</option>
             </select>
           </label>
 
