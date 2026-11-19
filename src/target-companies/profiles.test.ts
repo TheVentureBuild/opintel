@@ -21,6 +21,17 @@ test('CSV preview converts to target-company profiles without inventing missing 
   assert.equal(companies[1].country, null)
 })
 
+test('company names and website domains do not create unsupported capabilities or location', () => {
+  const companies = csvPreviewToTargetCompanies(parseTargetCompanyCsv([
+    'company name,company URL',
+    'Bright Future Tech,https://brightfuture.in',
+  ].join('\n')))
+
+  assert.equal(companies[0].country, null)
+  assert.equal(companies[0].capabilities, null)
+  assert.equal(companies[0].companyType, null)
+})
+
 test('recommendations evaluate each company and opportunity independently', () => {
   const csv = [
     'company name,company sector',

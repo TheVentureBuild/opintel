@@ -40,6 +40,7 @@ export interface TargetCompanyMatchInput {
   readonly description?: string | null
   readonly companyType?: string | null
   readonly website?: string | null
+  readonly foundedYear?: number | null
 }
 
 export interface TargetOpportunityInput {

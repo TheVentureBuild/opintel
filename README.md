@@ -39,13 +39,12 @@ Aggregates live opportunities through hardened, same-origin server bridges witho
 
 ---
 
-### 2. Target Company Ingestion & Web Intelligence (Firecrawl)
+### 2. Target Company Ingestion & Web Research (Firecrawl)
 * **CSV Bulk Importer:** Upload target company spreadsheets with auto-detection of columns (`company name`, `company HQ location`, `company sector`, `company URL`, `tags`).
 * **Persistent Local Storage:** Imported companies are securely persisted in browser storage (`tvb:target-companies:imported-set`) with full table preview and single-click reset.
-* **Firecrawl Web Intelligence Engine:**
-  * **Automatic Domain Resolution:** Discovers official company domains if the website URL is omitted or malformed.
-  * **Deep Capability Extraction:** Scrapes and parses tech stack, specialized capabilities, AI/ML focus, and target market segments (enterprise vs SMB).
-  * **Dual-Branch Jurisdiction Matching (India + US):** Automatically detects companies with multi-region operations (e.g., Bangalore HQ + US Delaware subsidiary). Enables simultaneous eligibility for Indian domestic tenders/grants and US/International federal RFPs.
+* **Evidence-backed Firecrawl Research:** When no website is supplied, web search returns candidate sites for a user to select. Research extracts only facts found in the selected page and displays source excerpts/links for review. Missing facts stay unknown; research failures do not produce synthetic company profiles.
+* **Explicit Confirmation:** Draft facts are not used in matching or saved until a user confirms them. A website mention or operating location is not proof of legal-entity registration or opportunity eligibility.
+* **Configuration:** Set the unprefixed `FIRECRAWL_API_KEY` in the git-ignored `.env` for local Vite development or in the backend host environment when deployed. Company names and selected website URLs are sent to Firecrawl for research.
   * **Intelligent Local Caching:** Caches enrichment results locally (`tvb:company-enrichment-cache`) to prevent redundant web scraping.
 
 ---
@@ -127,7 +126,7 @@ tvb-frontend/
 │   │   └── tables/              # Data tables with pagination and sorting
 │   ├── data/                    # Snapshot selectors and committed test fixtures
 │   ├── live-source/             # Same-origin bridges:
-│   │   ├── enrichment-bridge/   # Firecrawl web scraping, domain resolution & dual presence
+│   │   ├── enrichment-bridge/   # Evidence-backed Firecrawl company search and scraping
 │   │   ├── gem-bridge/          # GeM tender specifications & CPPP notices
 │   │   ├── india-grants-bridge/ # MeitY, iDEX, DST, BIRAC & state schemes
 │   │   ├── startup-india-bridge/# Startup India Seed Fund & national challenge bridge

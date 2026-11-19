@@ -87,37 +87,29 @@ export interface TargetCompanyLiveDiscoveryResult {
   readonly newRecordCount: number
 }
 
-export function isOpportunityOpen(deadline: string | null | undefined, status: string | null | undefined): boolean {
-  if (status) {
-    const s = status.toLowerCase()
-    if (
-      s.includes('closed') ||
-      s.includes('archived') ||
-      s.includes('expired') ||
-      s.includes('cancelled') ||
-      s.includes('awarded') ||
-      s.includes('conquered') ||
-      s.includes('contract award') ||
-      s.includes('award notice') ||
-      s.includes('aoc') ||
-      s.includes('winner') ||
-      s.includes('results of') ||
-      s.includes('completed') ||
-      s.includes('decided')
-    ) {
-      return false
-    }
+export function isOpportunityOpen(
+  deadline: string | null | undefined,
+  status: string | null | undefined,
+  now = Date.now(),
+): boolean {
+  const normalizedStatus = status?.trim().toLowerCase() ?? ''
+  if (
+    /\b(closed|archived|expired|cancelled|canceled|awarded|conquered|winner|completed|decided)\b/.test(normalizedStatus) ||
+    /contract award|award notice|results of|aoc\b|not open|no longer open/.test(normalizedStatus)
+  ) {
+    return false
   }
-  if (deadline) {
-    const dt = new Date(deadline)
-    if (!isNaN(dt.getTime())) {
-      // If deadline has already passed (prior to today), it is closed
-      if (dt.getTime() < Date.now() - 24 * 60 * 60 * 1000) {
-        return false
-      }
-    }
+
+  const normalizedDeadline = deadline?.trim() ?? ''
+  if (normalizedDeadline !== '') {
+    const dateOnly = normalizedDeadline.match(/^(\d{4})-(\d{2})-(\d{2})(?:T00:00(?::00(?:\.0+)?)?Z)?$/)
+    const dueAt = dateOnly
+      ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]), 23, 59, 59, 999)
+      : new Date(normalizedDeadline)
+    return !Number.isNaN(dueAt.getTime()) && dueAt.getTime() >= now
   }
-  return true
+
+  return /\b(open|active|ongoing|rolling)\b|\baccepting\s+(applications?|proposals?|bids?)\b/.test(normalizedStatus)
 }
 
 export function grantsGovRawToOpportunity(record: TargetCompanyLiveDiscoveryRecord): TargetOpportunityInput {
@@ -375,6 +367,7 @@ export async function runTargetCompanyGrantsGovDiscovery(
     for (const error of parsed.errors) errors.push(error.message)
 
     const observedAt = new Date().toISOString()
+    const currentResults = parsed.results.filter((result) => isOpportunityOpen(result.deadline, result.sourceStatus))
     const adapterResult: AdapterResult = {
       status: 'SUCCESS',
       sourceId: 'SU-GRANTS-001',
@@ -385,7 +378,7 @@ export async function runTargetCompanyGrantsGovDiscovery(
       requestedAt: observedAt,
       observedAt,
       blockedReason: null,
-      results: parsed.results,
+      results: currentResults,
       errors: parsed.errors,
       warnings: parsed.warnings,
       provenance: {
@@ -406,8 +399,7 @@ export async function runTargetCompanyGrantsGovDiscovery(
     const reviewItems = createReviewQueue(pipeline.candidates, { createdAt: observedAt })
     reviewFixtureStore.addReviewItems(reviewItems)
 
-    for (const result of parsed.results) {
-      if (!isOpportunityOpen(result.deadline, result.sourceStatus)) continue
+    for (const result of currentResults) {
       const id = `grantsgov:${result.sourceRecordId ?? result.sourceUrl}`
       if (!recordsById.has(id)) {
         recordsById.set(id, {

@@ -40,67 +40,48 @@ export function csvPreviewToTargetCompanies(preview: CsvPreview): TargetCompanyM
           .filter((t) => t.length > 0 && !t.startsWith('profile/') && !t.startsWith('relationship/'))
       : []
 
-    // If country is empty but URL has .in domain
-    if (!country && (url.includes('.in/') || url.endsWith('.in'))) {
-      country = 'India'
-    }
-
     const completion = loadProfileCompletion(suppliedName)
     const enriched = getCachedEnrichment(suppliedName)
     const effectiveCountry = country || enriched?.hqLocation || completion.deliveryCountries?.trim() || null
     const effectiveSector = sector || (enriched ? enriched.sectors.join(', ') : null) || completion.targetIndustries?.trim() || (parsedTags.length > 0 ? parsedTags.slice(0, 2).join(', ') : null)
     const effectiveUrl = url || enriched?.websiteUrl || null
 
-    const sectorParts = effectiveSector ? effectiveSector.split(/[\r\n,;]+/).map((value) => value.trim()).filter(Boolean) : []
-    const isSoftwareFirm = /software|it services|digital/i.test(`${effectiveSector} ${suppliedName}`)
-
-    // Name-derived keywords (e.g. "Datacolor AI" -> "AI")
-    const nameKeywords = suppliedName
-      .split(/[\s_-]+/)
-      .map((w) => w.trim())
-      .filter((w) => w.length >= 2 && !/^(the|and|pvt|ltd|inc|llc|corp|tech|technologies|services|company)$/i.test(w))
-
-    // If no explicit tags were provided in CSV, infer foundational capabilities from software services sector
-    const baselineCapabilities = parsedTags.length === 0 && (!enriched || enriched.capabilities.length === 0) && isSoftwareFirm
-      ? ['Custom Web Applications', 'Cloud Architecture', 'Automated QA Testing', 'API Integration']
+    const customNotesTerms = enriched?.customNotes
+      ? enriched.customNotes
+          .split(/[\r\n,;]+/)
+          .map((s) => s.trim())
+          .filter((s) => s.length >= 3 && s.length <= 80 && !/^(the|and|for|with|this|that|from|our|are|has|have)$/i.test(s))
       : []
 
     const capabilities = [
-      ...sectorParts,
       ...parsedTags,
       ...(enriched?.capabilities ?? []),
-      ...nameKeywords,
-      ...baselineCapabilities,
+      ...customNotesTerms,
       ...(completion.capabilities ? completion.capabilities.split(/[,;]+/).map((value) => value.trim()).filter(Boolean) : []),
       ...(completion.productsServices ? completion.productsServices.split(/[,;]+/).map((value) => value.trim()).filter(Boolean) : []),
       ...(completion.targetIndustries ? completion.targetIndustries.split(/[,;]+/).map((value) => value.trim()).filter(Boolean) : []),
     ]
 
-    const inferredType =
-      completion.applicantCategory?.trim() ||
-      enriched?.entityType ||
-      (/software|services|tech|solutions|ai|data|systems|corp|pvt|ltd|inc|consulting/i.test(`${suppliedName} ${effectiveSector} ${rawTags}`)
-        ? 'commercial'
-        : null)
-
     return {
       companyId: `target-row-${index + 2}`,
       name: suppliedName,
       country: effectiveCountry,
-      countries: enriched?.operatingCountries ?? null,
+      countries: enriched?.operatingCountries && enriched.operatingCountries.length > 0 ? enriched.operatingCountries : null,
       website: effectiveUrl,
+      foundedYear: enriched?.foundedYear ?? null,
       sector: effectiveSector,
       capabilities: capabilities.length > 0 ? [...new Set(capabilities)] : null,
       description: [
         effectiveUrl ? `Supplied website: ${effectiveUrl}` : null,
         icp ? `Ideal customer profile: ${icp}` : null,
         enriched?.summary ? `Enriched summary: ${enriched.summary}` : null,
+        enriched?.customNotes ? `Custom research notes: ${enriched.customNotes}` : null,
         parsedTags.length > 0 ? `Key capabilities: ${parsedTags.join(', ')}` : null,
         completion.productsServices ? `Products/services: ${completion.productsServices}` : null,
       ]
         .filter(Boolean)
         .join(' ') || null,
-      companyType: inferredType,
+      companyType: completion.applicantCategory?.trim() || enriched?.entityType || null,
     }
   })
 }

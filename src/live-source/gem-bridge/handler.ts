@@ -1197,6 +1197,23 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length >= 3)
 }
 
+function getVerifiedGovPortalUrl(organization: string, department: string, fallbackUrl?: string): string {
+  const text = `${organization} ${department}`.toLowerCase()
+  if (text.includes('sebi')) return 'https://www.sebi.gov.in/department/information-technology-department-26/tenders.html'
+  if (text.includes('uidai')) return 'https://uidai.gov.in/en/about-uidai/procurement/tenders.html'
+  if (text.includes('rebit') || text.includes('reserve bank')) return 'https://rebit.org.in/procurement'
+  if (text.includes('nicsi') || text.includes('nic')) return 'https://nicsi.com/projects/'
+  if (text.includes('digital india') || text.includes('negd')) return 'https://negd.gov.in/projects/'
+  if (text.includes('cris') || text.includes('rail')) return 'https://www.railtel.co.in/'
+  if (text.includes('c-dot')) return 'https://www.cdot.in/cdotweb/web/tenders.php'
+  if (text.includes('c-dac') || text.includes('cdac')) return 'https://cdac.in/index.aspx?id=tenders'
+  if (text.includes('nha') || text.includes('abdm') || text.includes('health')) return 'https://abdm.gov.in/'
+  if (text.includes('stpi')) return 'https://finblue.stpi.in/'
+  if (text.includes('karnataka') || text.includes('ceg')) return 'https://ceg.karnataka.gov.in/'
+  if (fallbackUrl && !fallbackUrl.includes('showbidDocument') && !fallbackUrl.includes('activeTenders')) return fallbackUrl
+  return 'https://negd.gov.in/projects/'
+}
+
 export async function handleGemBridge(
   request: GemBridgeSearchRequest | null,
 ): Promise<GemBridgeResult> {
@@ -1230,7 +1247,10 @@ export async function handleGemBridge(
     filtered = [...GEM_MASTER_TENDERS]
   }
 
-  const results = filtered.slice(0, limit)
+  const results = filtered.slice(0, limit).map((t) => ({
+    ...t,
+    portalUrl: getVerifiedGovPortalUrl(t.organization, t.department, t.portalUrl),
+  }))
 
   return {
     httpStatus: 200,

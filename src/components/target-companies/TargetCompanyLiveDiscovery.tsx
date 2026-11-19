@@ -24,6 +24,15 @@ import { THUB_BRIDGE_SEARCH_PATH } from '../../live-source/thub-bridge/contract'
 import type { ThubBridgeSearchResponse } from '../../live-source/thub-bridge/contract'
 import { ICREATE_BRIDGE_SEARCH_PATH } from '../../live-source/icreate-bridge/contract'
 import type { IcreateBridgeSearchResponse } from '../../live-source/icreate-bridge/contract'
+import { handleSamBridge } from '../../live-source/sam-bridge/handler'
+import { handleSbirBridge } from '../../live-source/sbir-bridge/handler'
+import { handleChallengeBridge } from '../../live-source/challenge-bridge/handler'
+import { handleStartupIndiaBridge } from '../../live-source/startup-india-bridge/handler'
+import { handleThubBridge } from '../../live-source/thub-bridge/handler'
+import { handleIcreateBridge } from '../../live-source/icreate-bridge/handler'
+import { handleGemBridge } from '../../live-source/gem-bridge/handler'
+import { handleIndiaGrantsBridge } from '../../live-source/india-grants-bridge/handler'
+import { handleWorldBankBridge } from '../../live-source/worldbank-bridge/handler'
 import { resolveBridgeUrl } from '../../live-source/bridge-url'
 import { loadImportedTargetCompanies } from '../../target-companies/store'
 import { csvPreviewToTargetCompanies } from '../../target-companies/profiles'
@@ -56,9 +65,10 @@ import { downloadLeadsCsv } from '../../target-companies/export-leads-csv'
 import MatchMatrix from './MatchMatrix'
 import LeadsDownloadMenu from './LeadsDownloadMenu'
 import { formatFriendlySourceName } from './match-matrix-model'
-import { requestCompanyEnrichment } from '../../target-companies/enrichment-store'
+import { requestCompanyEnrichment, saveCachedEnrichment, getCachedEnrichment } from '../../target-companies/enrichment-store'
+import type { CompanyWebsiteCandidate, EnrichedCompanyProfile } from '../../live-source/enrichment-bridge/contract'
 
-const TARGET_RESULTS_KEY = 'tvb.target-company-results.v1'
+const TARGET_RESULTS_KEY = 'tvb.target-company-results.v2'
 
 function loadCachedResults(): TargetCompanyLiveDiscoveryResult[] {
   try {
@@ -272,6 +282,9 @@ export default function TargetCompanyLiveDiscovery() {
   const [enrichmentVersion, setEnrichmentVersion] = useState(0)
   const [isEnriching, setIsEnriching] = useState(false)
   const [enrichmentStatus, setEnrichmentStatus] = useState<string | null>(null)
+  const [websiteCandidates, setWebsiteCandidates] = useState<Record<string, readonly CompanyWebsiteCandidate[]>>({})
+  const [enrichmentDrafts, setEnrichmentDrafts] = useState<Record<string, EnrichedCompanyProfile>>({})
+  const [enrichmentErrors, setEnrichmentErrors] = useState<Record<string, string>>({})
 
   const profiles = useMemo(() => {
     return imported ? csvPreviewToTargetCompanies(imported) : []
@@ -290,29 +303,185 @@ export default function TargetCompanyLiveDiscovery() {
   const handleAutoEnrich = async () => {
     if (profiles.length === 0 || isEnriching) return
     setIsEnriching(true)
-    setEnrichmentStatus('Initializing Firecrawl & web company intelligence...')
-
+    setEnrichmentStatus('Searching for company websites and preparing evidence-backed profile drafts...')
+    setEnrichmentErrors({})
     try {
+      let failedCount = 0
+      let draftCount = 0
+      let candidateCount = 0
+      let noCandidateCount = 0
       for (let i = 0; i < profiles.length; i++) {
-        const p = profiles[i]
-        setEnrichmentStatus(`[${i + 1}/${profiles.length}] Scraping & extracting intelligence for ${p.name}...`)
-        const enriched = await requestCompanyEnrichment({
-          companyName: p.name,
-          websiteUrl: p.website ?? (p.description?.match(/https?:\/\/[^\s]+/)?.[0] || null),
-        })
-        if (enriched) {
-          const dualNote = enriched.isMultiJurisdiction ? ' (Dual presence: India HQ & US branch)' : ''
-          setEnrichmentStatus(
-            `✓ [${i + 1}/${profiles.length}] ${p.name}: Discovered ${enriched.websiteUrl} · Extracted ${enriched.capabilities.length} capabilities${dualNote}`,
-          )
+        const profile = profiles[i]
+        setEnrichmentStatus(`[${i + 1}/${profiles.length}] Researching ${profile.name}...`)
+        try {
+          const result = await requestCompanyEnrichment({
+            companyName: profile.name,
+            websiteUrl: profile.website,
+          })
+          if (result.profile) {
+            draftCount++
+            setEnrichmentDrafts((current) => ({ ...current, [profile.companyId]: result.profile! }))
+            setWebsiteCandidates((current) => {
+              const next = { ...current }
+              delete next[profile.companyId]
+              return next
+            })
+          } else {
+            const candidates = result.websiteCandidates ?? []
+            if (candidates.length > 0) candidateCount++
+            else noCandidateCount++
+            setWebsiteCandidates((current) => ({
+              ...current,
+              [profile.companyId]: candidates,
+            }))
+          }
+        } catch (error) {
+          failedCount++
+          setEnrichmentErrors((current) => ({
+            ...current,
+            [profile.companyId]: error instanceof Error ? error.message : String(error),
+          }))
         }
       }
-      setEnrichmentVersion((v) => v + 1)
-      setTimeout(() => setEnrichmentStatus(null), 8000)
-    } catch (err) {
-      setEnrichmentStatus(`Enrichment encountered an issue: ${err instanceof Error ? err.message : String(err)}`)
+      setEnrichmentStatus(
+        failedCount === profiles.length
+          ? 'Research failed for all companies. See the error messages below.'
+          : `Research finished: ${draftCount} profile drafts, ${candidateCount} website candidates, ${noCandidateCount} with no results, ${failedCount} failed. Review any returned evidence before confirming a profile.`,
+      )
     } finally {
       setIsEnriching(false)
+    }
+  }
+
+  const researchWebsiteCandidate = async (
+    profile: (typeof profiles)[number],
+    candidate: CompanyWebsiteCandidate,
+  ) => {
+    if (isEnriching) return
+    setIsEnriching(true)
+    setEnrichmentErrors((current) => {
+      const next = { ...current }
+      delete next[profile.companyId]
+      return next
+    })
+    setEnrichmentStatus(`Reading ${candidate.url} for ${profile.name}...`)
+    try {
+      const result = await requestCompanyEnrichment({ companyName: profile.name, websiteUrl: candidate.url })
+      if (!result.profile) {
+        throw new Error('The selected site did not produce a profile draft.')
+      }
+      setEnrichmentDrafts((current) => ({ ...current, [profile.companyId]: result.profile! }))
+    } catch (error) {
+      setEnrichmentErrors((current) => ({
+        ...current,
+        [profile.companyId]: error instanceof Error ? error.message : String(error),
+      }))
+    } finally {
+      setEnrichmentStatus(null)
+      setIsEnriching(false)
+    }
+  }
+
+  const [editingDrafts, setEditingDrafts] = useState<Record<string, boolean>>({})
+
+  const getOrCreateDraft = (profile: (typeof profiles)[number]): EnrichedCompanyProfile => {
+    if (enrichmentDrafts[profile.companyId]) {
+      return enrichmentDrafts[profile.companyId]
+    }
+    const cached = getCachedEnrichment(profile.name)
+    if (cached) return cached
+    return {
+      companyName: profile.name,
+      websiteUrl: profile.website || '',
+      resolvedVia: 'search-discovery',
+      hqLocation: profile.country || '',
+      operatingCountries: profile.countries || (profile.country ? [profile.country] : []),
+      isMultiJurisdiction: (profile.countries?.length ?? 0) > 1,
+      sectors: profile.sector ? profile.sector.split(/[\r\n,;]+/).map((s) => s.trim()).filter(Boolean) : [],
+      capabilities: profile.capabilities ? [...profile.capabilities] : [],
+      entityType: profile.companyType || 'commercial',
+      summary: profile.description || '',
+      foundedYear: profile.foundedYear ?? null,
+      customNotes: '',
+      evidence: [],
+    }
+  }
+
+  const startEditingProfile = (profile: (typeof profiles)[number]) => {
+    const draft = getOrCreateDraft(profile)
+    setEnrichmentDrafts((current) => ({ ...current, [profile.companyId]: draft }))
+    setEditingDrafts((current) => ({ ...current, [profile.companyId]: true }))
+  }
+
+  const cancelEditingProfile = (companyId: string) => {
+    setEditingDrafts((current) => {
+      const next = { ...current }
+      delete next[companyId]
+      return next
+    })
+  }
+
+  const updateDraft = (companyId: string, updates: Partial<EnrichedCompanyProfile>) => {
+    setEnrichmentDrafts((current) => {
+      const existing = current[companyId]
+      if (!existing) return current
+      return {
+        ...current,
+        [companyId]: {
+          ...existing,
+          ...updates,
+        },
+      }
+    })
+  }
+
+  const saveEditedProfile = (profile: (typeof profiles)[number]) => {
+    const draft = enrichmentDrafts[profile.companyId]
+    if (!draft) return
+    try {
+      saveCachedEnrichment(draft)
+      setEditingDrafts((current) => {
+        const next = { ...current }
+        delete next[profile.companyId]
+        return next
+      })
+      setEnrichmentVersion((v) => v + 1)
+      setEnrichmentStatus(`${profile.name}'s verified intelligence was saved in browser storage. Ready for discovery!`)
+    } catch (error) {
+      setEnrichmentErrors((current) => ({
+        ...current,
+        [profile.companyId]: `Could not save profile: ${error instanceof Error ? error.message : String(error)}`,
+      }))
+    }
+  }
+
+  const confirmEnrichment = (profile: (typeof profiles)[number]) => {
+    const draft = enrichmentDrafts[profile.companyId] ?? getCachedEnrichment(profile.name)
+    if (!draft) return
+    try {
+      saveCachedEnrichment(draft)
+      setEnrichmentDrafts((current) => {
+        const next = { ...current }
+        delete next[profile.companyId]
+        return next
+      })
+      setEditingDrafts((current) => {
+        const next = { ...current }
+        delete next[profile.companyId]
+        return next
+      })
+      setWebsiteCandidates((current) => {
+        const next = { ...current }
+        delete next[profile.companyId]
+        return next
+      })
+      setEnrichmentVersion((version) => version + 1)
+      setEnrichmentStatus(`${profile.name}'s reviewed profile was saved in this browser. Discover opportunities to use it.`)
+    } catch (error) {
+      setEnrichmentErrors((current) => ({
+        ...current,
+        [profile.companyId]: `Could not save the reviewed profile: ${error instanceof Error ? error.message : String(error)}`,
+      }))
     }
   }
 
@@ -446,18 +615,6 @@ export default function TargetCompanyLiveDiscovery() {
       while (existingRuns.some((r) => r.runId === currentRunId)) {
         counter++
         currentRunId = `RUN-LIVE-${String(counter).padStart(4, '0')}`
-      }
-
-      // Auto-enrich any profiles that lack capabilities or location
-      for (const profile of profiles) {
-        if (!profile.capabilities || profile.capabilities.length <= 1 || !profile.country) {
-          try {
-            await requestCompanyEnrichment({
-              companyName: profile.name,
-              websiteUrl: profile.website ?? (profile.description?.match(/https?:\/\/[^\s]+/)?.[0] || null),
-            })
-          } catch {}
-        }
       }
 
       // Deduplicate query terms across all profiles so identical searches are only executed once
@@ -691,55 +848,60 @@ export default function TargetCompanyLiveDiscovery() {
         return promise
       }
 
+      async function requestWithFallback<TReq, TRes extends { ok: boolean }>(
+        path: string,
+        payload: TReq,
+        fallbackHandler: (req: TReq) => Promise<{ httpStatus: number; body: TRes }>,
+      ): Promise<TRes> {
+        try {
+          const response = await fetch(resolveBridgeUrl(path), {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (response.ok) {
+            const rawText = await response.text()
+            try {
+              const data = JSON.parse(rawText) as TRes
+              if (data && data.ok) {
+                return data
+              }
+            } catch {
+              // Non-JSON response, fallback
+            }
+          }
+        } catch {
+          // Network failure or sleeping Render container, fallback
+        }
+        try {
+          const local = await fallbackHandler(payload)
+          return local.body
+        } catch (err) {
+          return {
+            ok: false,
+            status: 500,
+            body: null,
+            errors: [{ code: 'fallback_error', message: err instanceof Error ? err.message : String(err) }],
+          } as unknown as TRes
+        }
+      }
+
       const gemCache = new Map<string, Promise<GemBridgeSearchResponse>>()
       const gemRequester = (term: string): Promise<GemBridgeSearchResponse> => {
         const key = term.trim().toLowerCase()
         const cached = gemCache.get(key)
         if (cached) return cached
-        const promise: Promise<GemBridgeSearchResponse> = (async (): Promise<GemBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(GEM_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: (GemBridgeSearchResponse & { error?: { code?: string; message?: string } }) | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `GeM bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'GeM bridge request failed' }))
-                : resObj?.error
-                  ? [{ code: resObj.error.code ?? 'bridge_error', message: resObj.error.message ?? 'GeM bridge request failed' }]
-                  : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from GeM bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          GEM_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleGemBridge,
+        )
         gemCache.set(key, promise)
         return promise
       }
@@ -749,50 +911,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = indiaGrantsCache.get(key)
         if (cached) return cached
-        const promise: Promise<IndiaGrantsBridgeSearchResponse> = (async (): Promise<IndiaGrantsBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(INDIA_GRANTS_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: (IndiaGrantsBridgeSearchResponse & { error?: { code?: string; message?: string } }) | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `India Grants bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'India Grants bridge request failed' }))
-                : resObj?.error
-                  ? [{ code: resObj.error.code ?? 'bridge_error', message: resObj.error.message ?? 'India Grants bridge request failed' }]
-                  : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from India Grants bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          INDIA_GRANTS_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleIndiaGrantsBridge,
+        )
         indiaGrantsCache.set(key, promise)
         return promise
       }
@@ -802,50 +931,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = worldBankCache.get(key)
         if (cached) return cached
-        const promise: Promise<WorldBankBridgeSearchResponse> = (async (): Promise<WorldBankBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(WORLDBANK_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: (WorldBankBridgeSearchResponse & { error?: { code?: string; message?: string } }) | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `World Bank bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'World Bank bridge request failed' }))
-                : resObj?.error
-                  ? [{ code: resObj.error.code ?? 'bridge_error', message: resObj.error.message ?? 'World Bank bridge request failed' }]
-                  : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from World Bank bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          WORLDBANK_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleWorldBankBridge,
+        )
         worldBankCache.set(key, promise)
         return promise
       }
@@ -855,48 +951,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = samCache.get(key)
         if (cached) return cached
-        const promise: Promise<SamBridgeSearchResponse> = (async (): Promise<SamBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(SAM_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: SamBridgeSearchResponse | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `SAM.gov bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'SAM.gov bridge request failed' }))
-                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from SAM.gov bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          SAM_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleSamBridge,
+        )
         samCache.set(key, promise)
         return promise
       }
@@ -906,48 +971,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = sbirCache.get(key)
         if (cached) return cached
-        const promise: Promise<SbirBridgeSearchResponse> = (async (): Promise<SbirBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(SBIR_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: SbirBridgeSearchResponse | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `SBIR.gov bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'SBIR.gov bridge request failed' }))
-                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from SBIR.gov bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          SBIR_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleSbirBridge,
+        )
         sbirCache.set(key, promise)
         return promise
       }
@@ -957,48 +991,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = challengeCache.get(key)
         if (cached) return cached
-        const promise: Promise<ChallengeBridgeSearchResponse> = (async (): Promise<ChallengeBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(CHALLENGE_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: ChallengeBridgeSearchResponse | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `Challenge.gov bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'Challenge.gov bridge request failed' }))
-                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from Challenge.gov bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          CHALLENGE_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleChallengeBridge,
+        )
         challengeCache.set(key, promise)
         return promise
       }
@@ -1008,48 +1011,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = startupIndiaCache.get(key)
         if (cached) return cached
-        const promise: Promise<StartupIndiaBridgeSearchResponse> = (async (): Promise<StartupIndiaBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(STARTUP_INDIA_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: StartupIndiaBridgeSearchResponse | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `Startup India bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'Startup India bridge request failed' }))
-                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from Startup India bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          STARTUP_INDIA_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleStartupIndiaBridge,
+        )
         startupIndiaCache.set(key, promise)
         return promise
       }
@@ -1059,48 +1031,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = thubCache.get(key)
         if (cached) return cached
-        const promise: Promise<ThubBridgeSearchResponse> = (async (): Promise<ThubBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(THUB_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: ThubBridgeSearchResponse | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `T-Hub bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'T-Hub bridge request failed' }))
-                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from T-Hub bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          THUB_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleThubBridge,
+        )
         thubCache.set(key, promise)
         return promise
       }
@@ -1110,48 +1051,17 @@ export default function TargetCompanyLiveDiscovery() {
         const key = term.trim().toLowerCase()
         const cached = icreateCache.get(key)
         if (cached) return cached
-        const promise: Promise<IcreateBridgeSearchResponse> = (async (): Promise<IcreateBridgeSearchResponse> => {
-          try {
-            const response = await fetch(resolveBridgeUrl(ICREATE_BRIDGE_SEARCH_PATH), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                runId: currentRunId,
-                companyId: 'target-discovery',
-                keyword: term.trim(),
-                limit: 100,
-                requestedAt: new Date().toISOString(),
-              }),
-            })
-            const rawText = await response.text()
-            let data: IcreateBridgeSearchResponse | null = null
-            try {
-              data = JSON.parse(rawText)
-            } catch {
-              return {
-                ok: false as const,
-                status: response.status || 502,
-                body: null,
-                errors: [{ code: 'invalid_response', message: `iCreate bridge returned HTTP ${response.status} with non-JSON response` }],
-              }
-            }
-            if (!data || !data.ok || (typeof data.status === 'number' && data.status >= 400)) {
-              const resObj = data as { errors?: readonly { code?: string; message?: string }[]; error?: { code?: string; message?: string } } | null
-              const errs = Array.isArray(resObj?.errors) && resObj.errors.length > 0
-                ? resObj.errors.map((e) => ({ code: e.code ?? 'bridge_error', message: e.message ?? 'iCreate bridge request failed' }))
-                : [{ code: 'http_error', message: `HTTP ${data?.status ?? response.status} from iCreate bridge` }]
-              return { ok: false as const, status: data?.status ?? response.status, body: null, errors: errs }
-            }
-            return data
-          } catch (error) {
-            return {
-              ok: false as const,
-              status: 500,
-              body: null,
-              errors: [{ code: 'network_error', message: error instanceof Error ? error.message : String(error) }],
-            }
-          }
-        })()
+        const promise = requestWithFallback(
+          ICREATE_BRIDGE_SEARCH_PATH,
+          {
+            runId: currentRunId,
+            companyId: 'target-discovery',
+            keyword: term.trim(),
+            limit: 100,
+            requestedAt: new Date().toISOString(),
+          },
+          handleIcreateBridge,
+        )
         icreateCache.set(key, promise)
         return promise
       }
@@ -1266,7 +1176,7 @@ export default function TargetCompanyLiveDiscovery() {
           const challengeResult = await runTargetCompanyChallengeDiscovery(profile, challengeRequester)
           nextResults.push(mergeDiscoveryResults(profile, [grantsResult, sbirResult, challengeResult]))
         } else {
-          // 'all' — multi-source discovery across all 12 live systems!
+          // 'all' — search live feeds and report disabled connectors as source errors.
           const grantsResult = await runTargetCompanyDiscovery(profile, grantsRequester, euRequester)
           const tedResult = await runTargetCompanyTedDiscovery(profile, tedRequester)
           const gemResult = await runTargetCompanyGemDiscovery(profile, gemRequester)
@@ -1453,7 +1363,7 @@ export default function TargetCompanyLiveDiscovery() {
           Ready to Discover Opportunities
         </div>
         <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', margin: '0 auto 16px', maxWidth: '540px', lineHeight: 1.5 }}>
-          Upload a target company CSV above (1–50 companies) to unlock automated multi-source discovery across Grants.gov, EU SEDIA, and TED Procurement tenders with explainable suitability scoring.
+          Upload a target company CSV above (1–50 companies) to search live Grants.gov, EU SEDIA, TED, and World Bank feeds. Other connectors are disabled until their live data can be verified.
         </p>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '6px 16px', borderRadius: '999px', border: '1px solid var(--border)' }}>
           <span>💡 Tip:</span>
@@ -1474,7 +1384,7 @@ export default function TargetCompanyLiveDiscovery() {
               Target Company Live Discovery
             </h2>
             <p className="page__description" style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Automated multi-source search across 12 live systems (Grants.gov, SAM.gov, SBIR.gov, Challenge.gov, EU SEDIA, TED Procurement tenders, GeM &amp; CPPP, MeitY / iDEX, Startup India, T-Hub, iCreate, and World Bank), matched against your {profiles.length} imported company profiles with explainable suitability scoring.
+              Searches live Grants.gov, EU SEDIA, TED, and World Bank feeds against {profiles.length} imported company profiles. Unverified connectors are disabled; past-deadline or undated opportunities without an explicit open status are excluded. Verify each official notice and eligibility before applying.
             </p>
           </div>
           <span className="sn-tag sn-tag--accent" style={{ alignSelf: 'center', fontSize: '12px' }}>
@@ -1499,10 +1409,10 @@ export default function TargetCompanyLiveDiscovery() {
             className="btn btn--outline"
             onClick={handleAutoEnrich}
             disabled={running || isEnriching || profiles.length === 0}
-            title="Automatically discover website, scrape with Firecrawl, and extract tech capabilities + dual India/US presence"
+            title="Search company websites and prepare source-linked profile drafts for your review"
             style={{ padding: '9px 16px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            {isEnriching ? '⚡ Crawling with Firecrawl...' : '⚡ Enrich with Firecrawl'}
+            {isEnriching ? '⚡ Researching companies...' : '⚡ Research company profiles'}
           </button>
 
           {/* Opportunity Scope Selector */}
@@ -1523,13 +1433,13 @@ export default function TargetCompanyLiveDiscovery() {
               disabled={running}
               aria-label="Opportunity Discovery Scope"
             >
-              <option value="all">All Opportunities (Global + US Federal + India All Combined)</option>
-              <option value="india-all">All Indian Opportunities (GeM Tenders + MeitY + Startup India + T-Hub + iCreate)</option>
-              <option value="us-federal">US Federal Opportunities (SAM.gov RFPs + SBIR.gov Grants + USA.gov Challenges)</option>
-              <option value="india-grants">India Innovation Grants (MeitY, iDEX, Startup India, T-Hub, iCreate)</option>
-              <option value="india-rfps">India RFPs &amp; Public Tenders (GeM &amp; CPPP Central/State Govt)</option>
-              <option value="grants">Global Grants &amp; Innovation Funding (Grants.gov + EU SEDIA + SBIR.gov)</option>
-              <option value="rfps">Global RFPs &amp; Government Procurement (TED EU + World Bank + SAM.gov)</option>
+              <option value="all">All feeds (Global Grants &amp; RFPs)</option>
+              <option value="india-all">India opportunities (GeM / CPPP &amp; Innovation Grants)</option>
+              <option value="us-federal">US federal (SAM.gov, Grants.gov, SBIR, Challenges)</option>
+              <option value="india-grants">India grants (MeitY, STPI FinBlue, DST, State Funds)</option>
+              <option value="india-rfps">India tenders (GeM &amp; Central PSU Procurements)</option>
+              <option value="grants">Grants &amp; Innovation Funding (US, EU &amp; India)</option>
+              <option value="rfps">RFPs &amp; Public Procurement (Tenders &amp; Contracts)</option>
             </select>
           </label>
 
@@ -1568,7 +1478,337 @@ export default function TargetCompanyLiveDiscovery() {
             <span>{enrichmentStatus}</span>
           </div>
         ) : null}
+
+        <p style={{ margin: '12px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+          Company names and selected website URLs are sent to the configured Firecrawl service for research. Search results are only candidates; extracted facts are not used until you review and confirm the profile.
+        </p>
       </div>
+
+      {profiles.length > 0 ? (
+        <section
+          aria-label="Company research review"
+          className="card"
+          style={{ padding: '20px', marginBottom: '20px' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '16px' }}>Company Intelligence &amp; Research Review</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0' }}>
+                Auto-enrich with Firecrawl, adjust corporate facts, or paste your own analyst research notes into the text box below.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={handleAutoEnrich}
+                disabled={running || isEnriching}
+                style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              >
+                {isEnriching ? '⚡ Researching...' : '⚡ Auto-Enrich All via Firecrawl'}
+              </button>
+            </div>
+          </div>
+
+          {profiles.map((profile) => {
+            const candidates = websiteCandidates[profile.companyId] ?? []
+            const draft = enrichmentDrafts[profile.companyId] ?? getCachedEnrichment(profile.name)
+            const isEditing = Boolean(editingDrafts[profile.companyId])
+            const error = enrichmentErrors[profile.companyId]
+
+            return (
+              <article
+                key={profile.companyId}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginBottom: '14px',
+                  background: 'var(--surface)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 600 }}>{profile.name}</h4>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      {profile.website ? <span>Website: <a href={profile.website} target="_blank" rel="noreferrer">{profile.website}</a> | </span> : null}
+                      <span>HQ: {profile.country || 'Unknown (edit below)'}</span>
+                      {profile.countries && profile.countries.length > 0 ? <span> | Operating: {profile.countries.join(', ')}</span> : null}
+                      {profile.foundedYear ? <span> | Est: {profile.foundedYear}</span> : null}
+                      {profile.companyType ? <span> | Type: {profile.companyType}</span> : null}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {!isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn--outline btn--sm"
+                          disabled={isEnriching}
+                          onClick={() => startEditingProfile(profile)}
+                          style={{ fontSize: '12px', padding: '5px 10px' }}
+                        >
+                          ✏️ Edit Profile &amp; Notes
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--outline btn--sm"
+                          disabled={isEnriching}
+                          onClick={async () => {
+                            try {
+                              setIsEnriching(true)
+                              setEnrichmentStatus(`Researching ${profile.name}...`)
+                              const result = await requestCompanyEnrichment({ companyName: profile.name, websiteUrl: profile.website })
+                              if (result.profile) {
+                                setEnrichmentDrafts((curr) => ({ ...curr, [profile.companyId]: result.profile! }))
+                              } else if (result.websiteCandidates && result.websiteCandidates.length > 0) {
+                                setWebsiteCandidates((curr) => ({ ...curr, [profile.companyId]: result.websiteCandidates! }))
+                              }
+                            } catch (e) {
+                              setEnrichmentErrors((curr) => ({ ...curr, [profile.companyId]: e instanceof Error ? e.message : String(e) }))
+                            } finally {
+                              setIsEnriching(false)
+                              setEnrichmentStatus(null)
+                            }
+                          }}
+                          style={{ fontSize: '12px', padding: '5px 10px' }}
+                        >
+                          ⚡ Auto-Enrich
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {error ? <p role="alert" style={{ color: 'var(--error-text)', fontSize: '13px' }}>{error}</p> : null}
+
+                {candidates.length > 0 ? (
+                  <div style={{ marginBottom: '14px', padding: '12px', background: 'var(--surface-subtle)', borderRadius: '6px' }}>
+                    <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: '13px' }}>Possible websites found — select one to research:</p>
+                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                      {candidates.map((cand) => (
+                        <li key={cand.url} style={{ marginBottom: '8px', fontSize: '13px' }}>
+                          <a href={cand.url} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>{cand.title || cand.url}</a>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{cand.url}</div>
+                          {cand.description ? <div style={{ fontSize: '12px', margin: '2px 0' }}>{cand.description}</div> : null}
+                          <button
+                            type="button"
+                            className="btn btn--sm btn--outline"
+                            style={{ marginTop: '4px', fontSize: '11px', padding: '3px 8px' }}
+                            disabled={isEnriching}
+                            onClick={() => void researchWebsiteCandidate(profile, cand)}
+                          >
+                            Research this website
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {isEditing && draft ? (
+                  <div style={{ background: 'var(--surface-subtle, rgba(0,0,0,0.02))', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <h5 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Edit Company Information &amp; Custom Research</h5>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>
+                        Website URL
+                        <input
+                          type="text"
+                          className="sn-input"
+                          style={{ width: '100%', marginTop: '4px', padding: '6px 8px', fontSize: '13px' }}
+                          value={draft.websiteUrl || ''}
+                          onChange={(e) => updateDraft(profile.companyId, { websiteUrl: e.target.value })}
+                          placeholder="https://example.com"
+                        />
+                      </label>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>
+                        Established / Founded Year
+                        <input
+                          type="number"
+                          className="sn-input"
+                          style={{ width: '100%', marginTop: '4px', padding: '6px 8px', fontSize: '13px' }}
+                          value={draft.foundedYear ?? ''}
+                          onChange={(e) => updateDraft(profile.companyId, { foundedYear: e.target.value ? Number(e.target.value) : null })}
+                          placeholder="e.g. 2000"
+                        />
+                      </label>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>
+                        Headquarters Location / Country
+                        <input
+                          type="text"
+                          className="sn-input"
+                          style={{ width: '100%', marginTop: '4px', padding: '6px 8px', fontSize: '13px' }}
+                          value={draft.hqLocation || ''}
+                          onChange={(e) => updateDraft(profile.companyId, { hqLocation: e.target.value })}
+                          placeholder="e.g. Bangalore, India"
+                        />
+                      </label>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>
+                        Operating Countries (comma-separated)
+                        <input
+                          type="text"
+                          className="sn-input"
+                          style={{ width: '100%', marginTop: '4px', padding: '6px 8px', fontSize: '13px' }}
+                          value={draft.operatingCountries?.join(', ') || ''}
+                          onChange={(e) => updateDraft(profile.companyId, { operatingCountries: e.target.value.split(/[,;]+/).map((s) => s.trim()).filter(Boolean) })}
+                          placeholder="e.g. India, United States"
+                        />
+                      </label>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>
+                        Entity Classification
+                        <select
+                          className="sn-select"
+                          style={{ width: '100%', marginTop: '4px', padding: '6px 8px', fontSize: '13px' }}
+                          value={draft.entityType || 'commercial'}
+                          onChange={(e) => updateDraft(profile.companyId, { entityType: e.target.value })}
+                        >
+                          <option value="commercial">Commercial Enterprise (Established)</option>
+                          <option value="startup">Early-Stage Startup</option>
+                          <option value="sme">Small &amp; Medium Enterprise (SME)</option>
+                          <option value="nonprofit">Non-Profit Organization</option>
+                          <option value="higher_ed">Higher Education / University</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                        Industry Sectors (comma-separated)
+                      </label>
+                      <input
+                        type="text"
+                        className="sn-input"
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '13px' }}
+                        value={draft.sectors?.join(', ') || ''}
+                        onChange={(e) => updateDraft(profile.companyId, { sectors: e.target.value.split(/[,;]+/).map((s) => s.trim()).filter(Boolean) })}
+                        placeholder="e.g. Software Services, Financial Services, Healthcare IT"
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                        Key Capabilities &amp; Technical Offerings (comma-separated)
+                      </label>
+                      <input
+                        type="text"
+                        className="sn-input"
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '13px' }}
+                        value={draft.capabilities?.join(', ') || ''}
+                        onChange={(e) => updateDraft(profile.companyId, { capabilities: e.target.value.split(/[,;]+/).map((s) => s.trim()).filter(Boolean) })}
+                        placeholder="e.g. High-Frequency Trading, Trade Surveillance, FHIR Health APIs, Enterprise Cloud, Microservices"
+                      />
+                    </div>
+
+                    {/* Long Text Box for Extracted Internet Intelligence */}
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                        📝 Custom Extracted Intelligence &amp; Analyst Notes (Long Text Area)
+                      </label>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                        Paste any background, tech stack, client domains, or details you extracted from Google, LinkedIn, or corporate decks. These keywords are automatically extracted and merged into the live discovery engine.
+                      </div>
+                      <textarea
+                        rows={6}
+                        className="sn-input"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border)',
+                          fontFamily: 'inherit',
+                          fontSize: '13px',
+                          lineHeight: 1.5,
+                          resize: 'vertical',
+                          boxSizing: 'border-box',
+                        }}
+                        placeholder="Paste details here: e.g., Founded in 2000, Wissen Technology is an enterprise software consulting company with 1,500+ developers across Bangalore, Mumbai, Pune, and New Jersey. Specializes in low-latency high-frequency algorithmic trading systems, trade surveillance, market data feeds, FHIR electronic health record integrations, microservices, cloud migrations..."
+                        value={draft.customNotes || ''}
+                        onChange={(e) => updateDraft(profile.companyId, { customNotes: e.target.value })}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="btn btn--primary"
+                        onClick={() => saveEditedProfile(profile)}
+                        style={{ padding: '8px 16px', fontWeight: 600 }}
+                      >
+                        💾 Save &amp; Confirm Intelligence
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--outline"
+                        onClick={() => cancelEditingProfile(profile.companyId)}
+                        style={{ padding: '8px 14px' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : draft ? (
+                  <div style={{ background: 'var(--surface-subtle, rgba(0,0,0,0.02))', padding: '14px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '13px', marginBottom: '10px' }}>
+                      <p style={{ margin: 0 }}><strong>Website:</strong> <a href={draft.websiteUrl} target="_blank" rel="noreferrer">{draft.websiteUrl || 'Not set'}</a></p>
+                      <p style={{ margin: 0 }}><strong>Established:</strong> {draft.foundedYear ? `${draft.foundedYear} (${new Date().getFullYear() - draft.foundedYear} yrs)` : 'Unknown'}</p>
+                      <p style={{ margin: 0 }}><strong>Headquarters:</strong> {draft.hqLocation || 'Not set'}</p>
+                      <p style={{ margin: 0 }}><strong>Operating:</strong> {draft.operatingCountries?.join(', ') || 'Not set'}</p>
+                      <p style={{ margin: 0 }}><strong>Entity Type:</strong> {draft.entityType || 'Commercial'}</p>
+                    </div>
+                    <div style={{ fontSize: '13px', marginBottom: '8px' }}>
+                      <strong>Sectors:</strong> {draft.sectors?.join(', ') || 'None specified'}
+                    </div>
+                    <div style={{ fontSize: '13px', marginBottom: '8px' }}>
+                      <strong>Capabilities:</strong> {draft.capabilities?.join(', ') || 'None specified'}
+                    </div>
+                    {draft.customNotes ? (
+                      <div style={{ marginTop: '10px', padding: '10px', background: 'var(--surface)', borderRadius: '6px', border: '1px dashed var(--border)' }}>
+                        <strong style={{ fontSize: '12px', display: 'block', color: 'var(--accent)', marginBottom: '4px' }}>📝 Custom Extracted Intelligence Notes:</strong>
+                        <p style={{ margin: 0, fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{draft.customNotes}</p>
+                      </div>
+                    ) : null}
+                    {draft.evidence && draft.evidence.length > 0 ? (
+                      <div style={{ marginTop: '10px', fontSize: '12px' }}>
+                        <strong>Firecrawl Evidence:</strong>
+                        <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
+                          {draft.evidence.map((item, index) => (
+                            <li key={`${item.field}-${index}`} style={{ marginBottom: '4px' }}>
+                              <span>{item.field}: <em>{item.value}</em></span>
+                              {item.sourceUrl ? <span> — <a href={item.sourceUrl} target="_blank" rel="noreferrer">source</a></span> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--primary"
+                        onClick={() => confirmEnrichment(profile)}
+                        style={{ padding: '6px 12px', fontWeight: 600 }}
+                      >
+                        ✓ Confirm &amp; Save Profile
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--outline"
+                        onClick={() => startEditingProfile(profile)}
+                        style={{ padding: '6px 12px' }}
+                      >
+                        ✏️ Edit Facts or Notes
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    No research recorded yet. Click <strong>⚡ Auto-Enrich</strong> to fetch via Firecrawl, or <strong>✏️ Edit Profile &amp; Notes</strong> to paste facts directly into the long text box.
+                  </div>
+                )}
+              </article>
+            )
+          })}
+        </section>
+      ) : null}
 
       {runError !== null ? (
         <div role="alert" className="empty" style={{ borderColor: 'var(--error-border)', background: 'var(--error-bg)', marginBottom: '16px' }}>

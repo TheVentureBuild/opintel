@@ -5,9 +5,9 @@
  *
  * It binds to loopback by default (`TVB_HOST=127.0.0.1`). The Vault-write
  * bridge is deliberately NOT registered here: this process imports no
- * vault-writer code and exposes no filesystem-write route. All seven read-only
- * source handlers are wired in (TED, USAspending, Grants.gov, EU SEDIA, FTS,
- * GLEIF, SEC enrichment).
+ * vault-writer code and exposes no filesystem-write route. Verified live
+ * feeds are mounted alongside connectors that explicitly report unavailable
+ * until a live source has been implemented.
  *
  * Run with the project's existing `tsx` runtime (no new dependency, no build
  * step); the project's tsconfigs are `noEmit`, so a TS-to-JS server build is
@@ -168,8 +168,8 @@ function main(): void {
     console.log(`[tvb-host] listening on http://${config.host}:${port}`)
     console.log(`[tvb-host] serving static assets from ${config.distDir}`)
     console.log(
-      `[tvb-host] read-only bridges: ${TED_BRIDGE_SEARCH_PATH}, ${USA_BRIDGE_SEARCH_PATH}, ${GRANTS_GOV_BRIDGE_SEARCH_PATH}, ` +
-        `${EU_SEDIA_BRIDGE_SEARCH_PATH}, ${FTS_BRIDGE_SEARCH_PATH}, ${GLEIF_BRIDGE_SEARCH_PATH}, ${SEC_BRIDGE_ENRICH_PATH}`,
+      `[tvb-host] live read-only bridges: ${TED_BRIDGE_SEARCH_PATH}, ${USA_BRIDGE_SEARCH_PATH}, ${GRANTS_GOV_BRIDGE_SEARCH_PATH}, ` +
+        `${EU_SEDIA_BRIDGE_SEARCH_PATH}, ${WORLDBANK_BRIDGE_SEARCH_PATH}, ${FTS_BRIDGE_SEARCH_PATH}, ${GLEIF_BRIDGE_SEARCH_PATH}, ${SEC_BRIDGE_ENRICH_PATH}`,
     )
     console.log(
       `[tvb-host] limits: maxConcurrent=${config.maxConcurrent}, rateLimit=${config.rateLimit.max}/` +

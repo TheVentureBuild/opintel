@@ -19,6 +19,21 @@ export interface BatchCompanyEnrichmentRequest {
   readonly apiKey?: string | null
 }
 
+export interface EnrichmentEvidenceItem {
+  readonly field: string
+  readonly value: string
+  readonly excerpt: string
+  readonly sourceUrl: string
+  readonly observedAt: string
+}
+
+export interface CompanyWebsiteCandidate {
+  readonly url: string
+  readonly title?: string
+  readonly description?: string
+  readonly snippet?: string
+}
+
 export interface EnrichedCompanyProfile {
   readonly companyName: string
   readonly websiteUrl: string
@@ -31,12 +46,16 @@ export interface EnrichedCompanyProfile {
   readonly entityType: string
   readonly summary: string
   readonly rawMarkdownPreview?: string
+  readonly foundedYear?: number | null
+  readonly customNotes?: string | null
+  readonly evidence?: readonly EnrichmentEvidenceItem[]
 }
 
 export interface CompanyEnrichmentResponse {
   readonly ok: boolean
   readonly status: number
   readonly profile: EnrichedCompanyProfile | null
+  readonly websiteCandidates?: readonly CompanyWebsiteCandidate[]
   readonly errors?: readonly string[]
 }
 

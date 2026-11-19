@@ -36,40 +36,39 @@ import { tvbIcreateBridge } from './src/live-source/icreate-bridge/plugin'
 // (POST /__tvb/vault/{preview,write}); it reaches the filesystem writer only
 // when the server's own TVB_VAULT_ROOT environment variable names an
 // intended vault, and refuses honestly when that variable is unset.
-// The Phase 4 TED bridge (POST /__tvb/ted/search), the Phase V USAspending
-// bridge (POST /__tvb/usaspending/search), the Phase 19B Grants.gov bridge
-// (POST /__tvb/grantsgov/search), and the Phase 03A FTS bridge
-// (POST /__tvb/fts/search) are the only places live read-only source
-// searches execute: the browser control panels stay same-origin, and the
-// sources are never contacted from client code.
-export default defineConfig({
-  plugins: [
-    react(),
-    tvbVaultBridge(),
-    tvbTedBridge(),
-    tvbUsaSpendingBridge(),
-    tvbGrantsGovBridge(),
-    tvbEuSediaBridge(),
-    tvbFtsBridge(),
-    tvbGleifBridge(),
-    tvbSecBridge(),
-    tvbGemBridge(),
-    tvbIndiaGrantsBridge(),
-    tvbWorldBankBridge(),
-    tvbEnrichmentBridge(),
-    tvbSamBridge(),
-    tvbSbirBridge(),
-    tvbChallengeBridge(),
-    tvbStartupIndiaBridge(),
-    tvbThubBridge(),
-    tvbIcreateBridge(),
-  ],
-  server: {
-    port: 5173,
-    strictPort: true,
-  },
-  preview: {
-    port: 4173,
-    strictPort: true,
-  },
+// Verified live read-only source calls run in server-side bridges. Legacy
+// sample-catalog bridges return explicit source_not_live errors; they never
+// emit the sample records formerly bundled with them.
+export default defineConfig(() => {
+  return {
+    plugins: [
+      react(),
+      tvbVaultBridge(),
+      tvbTedBridge(),
+      tvbUsaSpendingBridge(),
+      tvbGrantsGovBridge(),
+      tvbEuSediaBridge(),
+      tvbFtsBridge(),
+      tvbGleifBridge(),
+      tvbSecBridge(),
+      tvbGemBridge(),
+      tvbIndiaGrantsBridge(),
+      tvbWorldBankBridge(),
+      tvbEnrichmentBridge(),
+      tvbSamBridge(),
+      tvbSbirBridge(),
+      tvbChallengeBridge(),
+      tvbStartupIndiaBridge(),
+      tvbThubBridge(),
+      tvbIcreateBridge(),
+    ],
+    server: {
+      port: 5173,
+      strictPort: true,
+    },
+    preview: {
+      port: 4173,
+      strictPort: true,
+    },
+  }
 })
