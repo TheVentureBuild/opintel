@@ -601,3 +601,38 @@ test('Wissen Tech: Saint Lucia Finance Officer Individual Consultant notice is r
   assert.equal(result.applicantEligibilityStatus, 'ineligible')
   assert.ok(result.reasons.some((r) => /Individual Consultant|employment vacancy/i.test(r)))
 })
+
+test('Domain Gravity Multiplier: Generic IT keywords only without vertical anchor phrases are capped <=20% and marked not_relevant', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'GENERIC-OPP-1',
+      opportunityType: 'procurement',
+      title: 'General Enterprise IT Software and Technical Support Services',
+      description: 'Provision of generic software development, project management, web portal support, and systems maintenance services.',
+      country: 'US',
+      sourceUrl: 'https://example.org/generic-opp-1',
+    },
+  )
+  assert.equal(result.outcome, 'not_relevant')
+  assert.ok((result.score ?? 0) <= 20, `Generic vocabulary score should be capped <= 20, got ${result.score}`)
+  assert.ok(result.reasons.some((r) => /domain alignment|generic vocabulary/i.test(r)))
+})
+
+test('Anchor-Vertical Matching: Multi-word phrase matching elevates core fintech/banking opportunity to top-tier score (>=85%)', () => {
+  const result = evaluateTargetCompanyRelevance(
+    WISSEN_TECH,
+    {
+      opportunityId: 'FINTECH-DIRECT-1',
+      opportunityType: 'procurement',
+      title: 'Core Banking API Gateway and Financial Reconciliation Engine Modernization',
+      description: 'Implementation of low-latency banking API gateways, trade surveillance, and financial reconciliation modules for national banking consortium.',
+      country: 'US',
+      applicantTypes: ['Commercial Vendor', 'Consulting Firm', 'SME'],
+      sourceUrl: 'https://example.org/fintech-direct-1',
+    },
+  )
+  assert.equal(result.outcome, 'relevant')
+  assert.ok((result.score ?? 0) >= 85, `Sweet-spot match score should be >= 85, got ${result.score}`)
+  assert.ok(result.reasons.some((r) => /Core vertical domain phrases matched/i.test(r)))
+})

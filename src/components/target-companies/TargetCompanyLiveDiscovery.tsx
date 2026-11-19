@@ -277,6 +277,20 @@ function syncRecommendationsToReviewQueue(
   return candidatesNeedingReview
 }
 
+function getGroupRelevanceTier(group: { assessments?: readonly { outcome?: string }[] }): number {
+  let highestTier = 0
+  for (const item of group.assessments ?? []) {
+    if (item.outcome === 'relevant') {
+      highestTier = Math.max(highestTier, 3)
+    } else if (item.outcome === 'potentially_relevant') {
+      highestTier = Math.max(highestTier, 2)
+    } else if (item.outcome === 'insufficient_evidence') {
+      highestTier = Math.max(highestTier, 1)
+    }
+  }
+  return highestTier
+}
+
 export default function TargetCompanyLiveDiscovery() {
   const imported = loadImportedTargetCompanies()
   const [enrichmentVersion, setEnrichmentVersion] = useState(0)
@@ -588,10 +602,22 @@ export default function TargetCompanyLiveDiscovery() {
           const dateB = b.assessments?.[0]?.deadline ? new Date(b.assessments[0].deadline).getTime() : 0
           return dateA - dateB
         }
-        // sort by max score
+        // Primary sort: Prioritize high-confidence relevant and potential leads at the top;
+        // sink less relevant and non-relevant items to the very bottom / last.
+        const tierA = getGroupRelevanceTier(a)
+        const tierB = getGroupRelevanceTier(b)
+        if (tierB !== tierA) {
+          return tierB - tierA
+        }
+
+        // Secondary sort: highest calibrated score first
         const maxA = Math.max(...(a.assessments ?? []).map((item) => (typeof item?.score === 'number' ? item.score : 0)), 0)
         const maxB = Math.max(...(b.assessments ?? []).map((item) => (typeof item?.score === 'number' ? item.score : 0)), 0)
-        return maxB - maxA
+        if (maxB !== maxA) {
+          return maxB - maxA
+        }
+
+        return a.opportunityTitle.localeCompare(b.opportunityTitle)
       })
   }, [opportunityGroups, search, typeFilter, outcomeFilter, companyFilter, sourceFilter, sortBy])
 

@@ -101,7 +101,7 @@ const STOPWORDS = new Set([
 ])
 
 const GENERIC_TERMS = new Set([
-  'ai', 'product', 'products', 'software', 'technology', 'technologies',
+  'product', 'products', 'software', 'technology', 'technologies',
   'infrastructure', 'service', 'services', 'solution', 'solutions',
   'platform', 'platforms', 'system', 'systems', 'data', 'cloud', 'digital',
   'project', 'projects', 'program', 'programs', 'grant', 'grants',
@@ -113,6 +113,7 @@ const GENERIC_TERMS = new Set([
   'engineering', 'information', 'business', 'delivery', 'training',
   'process', 'processing', 'testing', 'deployment', 'integration', 'enterprise',
   'firm', 'firms', 'client', 'clients', 'center', 'centers', 'national', 'international',
+  'portal', 'portals', 'web', 'website', 'websites', 'maintenance', 'tool', 'tools',
 ])
 
 function normalize(value: string | null | undefined): string {
@@ -248,6 +249,78 @@ function opportunityAllTokens(opportunity: TargetOpportunityInput): string[] {
     ...(opportunity.sectors ?? []).flatMap((value) => tokens(value)),
     ...(opportunity.requirements ?? []).flatMap((value) => tokens(value)),
   ])]
+}
+
+const GENERIC_PHRASES = new Set([
+  'software services', 'software development', 'technology services', 'information technology',
+  'system development', 'systems development', 'project management', 'data platform',
+  'cloud services', 'solution provider', 'technical support', 'support services',
+  'enterprise software', 'software solutions', 'digital transformation', 'it services',
+  'web application', 'web applications', 'web development', 'application development',
+  'portal development', 'design development', 'custom software', 'system integration',
+  'testing commissioning', 'supply installation', 'technical services', 'consulting services',
+  'management system', 'information management', 'information systems',
+])
+
+function isGenericPhrase(phrase: string): boolean {
+  if (GENERIC_PHRASES.has(phrase)) return true
+  const words = phrase.split(/\s+/).filter(Boolean)
+  return words.length > 0 && words.every((w) => GENERIC_TERMS.has(w))
+}
+
+function extractKeyPhrases(text: string | null | undefined): string[] {
+  if (!text) return []
+  const segments = text.toLowerCase().split(/[\r\n,;&|/]+/).map((s) => s.trim()).filter(Boolean)
+  const phrases: string[] = []
+
+  for (const seg of segments) {
+    const cleaned = seg.replace(/[^a-z0-9\s-]/g, ' ').replace(/-/g, ' ').trim()
+    const words = cleaned.split(/\s+/).filter((w) => (w.length >= 3 || w === 'ai' || w === 'ml' || w === 'ar' || w === 'vr' || w === 'ui' || w === 'ux' || w === '5g') && !STOPWORDS.has(w))
+
+    if (words.length >= 2 && words.length <= 4) {
+      const p = words.join(' ')
+      if (!isGenericPhrase(p)) phrases.push(p)
+    }
+
+    for (let i = 0; i < words.length - 1; i++) {
+      const p2 = `${words[i]} ${words[i + 1]}`
+      if (!isGenericPhrase(p2)) phrases.push(p2)
+    }
+
+    for (let i = 0; i < words.length - 2; i++) {
+      const p3 = `${words[i]} ${words[i + 1]} ${words[i + 2]}`
+      if (!isGenericPhrase(p3)) phrases.push(p3)
+    }
+  }
+
+  return [...new Set(phrases)]
+}
+
+function companyDomainPhrases(company: TargetCompanyMatchInput): string[] {
+  const allText = `${company.sector ?? ''}; ${(company.capabilities ?? []).join('; ')}; ${company.description ?? ''}`
+  return extractKeyPhrases(allText)
+}
+
+function checkPhraseInText(phrase: string, text: string): boolean {
+  if (!phrase || !text) return false
+  if (text.includes(phrase)) return true
+  const pWords = phrase.split(/\s+/).filter(Boolean)
+  if (pWords.length === 0) return false
+  if (pWords.length === 1) {
+    const stem = pWords[0].replace(/(?:s|es)$/i, '')
+    const esc = stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`\\b${esc}(?:s|es)?\\b`, 'i').test(text)
+  }
+
+  const wordPatterns = pWords.map((w) => {
+    const stem = w.replace(/(?:s|es)$/i, '')
+    const esc = stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return `\\b${esc}(?:s|es)?\\b`
+  })
+
+  const pattern = wordPatterns.join('(?:\\s+\\w+){0,2}\\s+')
+  const regex = new RegExp(pattern, 'i')
+  return regex.test(text)
 }
 
 function isSoftwareCompany(company: TargetCompanyMatchInput): boolean {
@@ -540,14 +613,48 @@ export function evaluateTargetCompanyRelevance(
   const sharedCap = cCap.filter((token) => oReq.includes(token))
   const specificSharedCap = sharedCap.filter((token) => !GENERIC_TERMS.has(token))
 
+  // Domain Phrase Matching & Multiplier (Option 1 & Option 2 combined)
+  const cPhrases = companyDomainPhrases(company)
+  const oppSearchText = `${opportunity.title} ${opportunity.description ?? ''} ${(opportunity.requirements ?? []).join(' ')} ${(opportunity.sectors ?? []).join(' ')}`.toLowerCase()
+  const matchedDomainPhrases = cPhrases.filter((p) => checkPhraseInText(p, oppSearchText))
+
+  if (matchedDomainPhrases.length > 0) {
+    reasons.push(`Core vertical domain phrases matched: ${matchedDomainPhrases.slice(0, 3).join(', ')}.`)
+  }
+
+  let domainGravity: number
+  if (cAll.length === 0 || oAll.length === 0) {
+    domainGravity = 1.0
+  } else if (matchedDomainPhrases.length >= 2) {
+    domainGravity = 1.0 // Core sweet spot lead
+  } else if (matchedDomainPhrases.length === 1) {
+    domainGravity = 1.0 // Strong anchor vertical phrase match
+  } else if (specificSharedSector.length >= 1 && specificSharedCap.length >= 1) {
+    domainGravity = 0.85 // High token overlap across both sector and capabilities
+  } else if (specificAllShared.length >= 2) {
+    domainGravity = 0.70 // Multiple specific domain tokens
+  } else if (specificAllShared.length === 1) {
+    domainGravity = 0.50 // Single specific domain token
+  } else {
+    domainGravity = 0.20 // Generic vocabulary only (services, software, system)
+  }
+
   let topicalRelevance: TargetTopicalRelevance
   if (cAll.length === 0 || oAll.length === 0) {
     missingFields.push(cAll.length === 0 ? 'company.sector/description/capabilities' : 'opportunity text')
     uncertainty.push('Sector/capability relevance cannot be confirmed because comparable text is missing.')
     topicalRelevance = 'insufficient_evidence'
-  } else if (specificAllShared.length >= 2 || (specificSharedSector.length >= 1 && specificSharedCap.length >= 1)) {
+  } else {
+    if (!(company.capabilities && company.capabilities.length > 0) && !company.description) {
+      uncertainty.push('Company capabilities and description are missing; scope evaluation is based on sector label alone.')
+    }
+    if (matchedDomainPhrases.length >= 1 || specificAllShared.length >= 2 || (specificSharedSector.length >= 1 && specificSharedCap.length >= 1)) {
     matchedFields.push('sector/capabilities')
-    reasons.push(`Shared relevant terms: ${specificAllShared.join(', ')}.`)
+    reasons.push(
+      matchedDomainPhrases.length > 0
+        ? `Specific vertical domain match: ${matchedDomainPhrases.slice(0, 2).join(', ')}.`
+        : `Shared relevant terms: ${specificAllShared.join(', ')}.`,
+    )
     topicalRelevance = 'strong_match'
   } else if (specificAllShared.length === 1) {
     matchedFields.push('sector/capabilities')
@@ -568,6 +675,7 @@ export function evaluateTargetCompanyRelevance(
     reasons.push('No shared sector, capability, or scope terms between the company profile and the opportunity.')
     topicalRelevance = 'unrelated'
   }
+}
 
   // 3. Applicant eligibility evaluation
   let applicantEligibilityStatus: TargetApplicantEligibility = 'unverified_unknown'
@@ -632,12 +740,16 @@ export function evaluateTargetCompanyRelevance(
   if (
     mismatchedFields.includes('sector/capabilities') ||
     mismatchedFields.includes('country') ||
-    mismatchedFields.includes('applicantType')
+    mismatchedFields.includes('applicantType') ||
+    (domainGravity < 0.35 && cAll.length > 0 && oAll.length > 0)
   ) {
     outcome = 'not_relevant'
+    if (domainGravity < 0.35 && cAll.length > 0 && oAll.length > 0 && !reasons.some((r) => r.includes('domain alignment'))) {
+      reasons.push('Opportunity lacks specific domain alignment with the company vertical (only generic vocabulary overlapped).')
+    }
   } else if (
     matchedFields.includes('sector/capabilities') &&
-    specificAllShared.length >= 1 &&
+    (domainGravity >= 0.80 || specificAllShared.length >= 1) &&
     matchedFields.includes('country') &&
     applicantEligibilityStatus !== 'ineligible' &&
     uncertainty.length === 0
@@ -645,11 +757,11 @@ export function evaluateTargetCompanyRelevance(
     outcome = 'relevant'
   } else if (
     matchedFields.includes('sector/capabilities') &&
-    specificAllShared.length >= 1 &&
+    (domainGravity >= 0.80 || specificAllShared.length >= 1) &&
     applicantEligibilityStatus !== 'ineligible'
   ) {
     outcome = 'potentially_relevant'
-  } else if (matchedFields.length >= 1 && topicalRelevance !== 'unrelated') {
+  } else if (matchedFields.length >= 1 && topicalRelevance !== 'unrelated' && domainGravity >= 0.35) {
     outcome = 'potentially_relevant'
   } else if (topicalRelevance === 'insufficient_evidence') {
     outcome = 'insufficient_evidence'
@@ -666,58 +778,76 @@ export function evaluateTargetCompanyRelevance(
   const industryAlignment: TargetRelevanceFactor = {
     score: cAll.length === 0 || oAll.length === 0
       ? null
-      : specificSharedSector.length >= 2
+      : matchedDomainPhrases.length >= 2
         ? 100
-        : specificSharedSector.length === 1
-          ? (hasTitleMatch ? 85 : 75)
-          : specificAllShared.length >= 1
-            ? 50
-            : sharedAll.length > 0
-              ? 20
-              : 0,
+        : matchedDomainPhrases.length === 1
+          ? 90
+          : specificSharedSector.length >= 2
+            ? 100
+            : specificSharedSector.length === 1
+              ? (hasTitleMatch ? 85 : 75)
+              : specificAllShared.length >= 1
+                ? 50
+                : sharedAll.length > 0
+                  ? 20
+                  : 0,
     weight: 25,
     evidence: specificSharedSector.length > 0 ? specificSharedSector.slice(0, 5) : sharedSector.slice(0, 5),
-    reason: specificSharedSector.length > 0
-      ? `Specific industry match (${specificSharedSector.join(', ')}).`
-      : sharedAll.length > 0
-        ? 'Shared terms limited to generic industry vocabulary.'
-        : 'No shared industry scope terms.',
+    reason: matchedDomainPhrases.length > 0
+      ? `Specific vertical domain phrase matched: ${matchedDomainPhrases.slice(0, 2).join(', ')}.`
+      : specificSharedSector.length > 0
+        ? `Specific industry match (${specificSharedSector.join(', ')}).`
+        : sharedAll.length > 0
+          ? 'Shared terms limited to generic industry vocabulary.'
+          : 'No shared industry scope terms.',
   }
 
   const capabilityAlignment: TargetRelevanceFactor = {
     score: cAll.length === 0 || oAll.length === 0
       ? null
-      : specificSharedCap.length >= 3
+      : matchedDomainPhrases.length >= 2
         ? 100
-        : specificSharedCap.length === 2
-          ? 90
-          : specificSharedCap.length === 1
-            ? (hasTitleMatch ? 82 : 72)
-            : specificAllShared.length >= 1
-              ? 50
-              : sharedAll.length > 0
-                ? 15
-                : 0,
+        : matchedDomainPhrases.length === 1
+          ? 95
+          : specificSharedCap.length >= 3
+            ? 100
+            : specificSharedCap.length === 2
+              ? 90
+              : specificSharedCap.length === 1
+                ? (hasTitleMatch ? 82 : 72)
+                : specificAllShared.length >= 1
+                  ? 50
+                  : sharedAll.length > 0
+                    ? 15
+                    : 0,
     weight: 25,
     evidence: specificSharedCap.length > 0 ? specificSharedCap.slice(0, 5) : sharedCap.slice(0, 5),
-    reason: specificSharedCap.length > 0
-      ? `Specific capability terms found (${specificSharedCap.join(', ')}).`
-      : sharedAll.length > 0
-        ? 'Generic technical overlap only.'
-        : 'No shared capability terms.',
+    reason: matchedDomainPhrases.length > 0
+      ? `Core capability phrase evidenced: ${matchedDomainPhrases.slice(0, 2).join(', ')}.`
+      : specificSharedCap.length > 0
+        ? `Specific capability terms found (${specificSharedCap.join(', ')}).`
+        : sharedAll.length > 0
+          ? 'Generic technical overlap only.'
+          : 'No shared capability terms.',
   }
 
   const useCaseAlignment: TargetRelevanceFactor = {
-    score: cAll.length > 0 && oAll.length > 0 && specificAllShared.length >= 2
-      ? Math.min(100, 70 + specificAllShared.length * 4 + (hasTitleMatch ? 12 : 0))
+    score: cAll.length > 0 && oAll.length > 0 && (matchedDomainPhrases.length >= 1 || specificAllShared.length >= 2)
+      ? matchedDomainPhrases.length >= 2
+        ? 95
+        : matchedDomainPhrases.length === 1
+          ? 90
+          : Math.min(100, 70 + specificAllShared.length * 4 + (hasTitleMatch ? 12 : 0))
       : specificAllShared.length === 1
         ? (hasTitleMatch ? 65 : 45)
         : null,
     weight: 20,
     evidence: specificAllShared.length >= 2 ? specificAllShared.slice(0, 3) : [],
-    reason: specificAllShared.length >= 2
-      ? (hasTitleMatch ? 'Title and use-case scope directly align with profile.' : 'Use-case scope aligned with profile description.')
-      : 'Use-case alignment is not yet evidenced by structured data.',
+    reason: matchedDomainPhrases.length > 0
+      ? 'Vertical use-case scope directly evidenced by domain phrase match.'
+      : specificAllShared.length >= 2
+        ? (hasTitleMatch ? 'Title and use-case scope directly align with profile.' : 'Use-case scope aligned with profile description.')
+        : 'Use-case alignment is not yet evidenced by structured data.',
   }
 
   const applicantEligibility: TargetRelevanceFactor = {
@@ -801,29 +931,32 @@ export function evaluateTargetCompanyRelevance(
   if (supportedWeight > 0) {
     const weightedSum = supportedFactors.reduce((sum, f) => sum + (f.score ?? 0) * f.weight, 0)
     const rawScore = Math.round(weightedSum / supportedWeight)
+    const calibratedScore = Math.round(rawScore * domainGravity)
 
     if (topicalRelevance === 'unrelated' || mismatchedFields.includes('sector/capabilities')) {
       score = 0
+    } else if (domainGravity < 0.35) {
+      score = Math.min(calibratedScore, 20)
     } else if (topicalRelevance === 'weak_match') {
-      score = Math.min(rawScore, 35)
+      score = Math.min(calibratedScore, 35)
     } else if (applicantEligibilityStatus === 'ineligible') {
-      score = Math.min(rawScore, 20)
+      score = Math.min(calibratedScore, 20)
     } else if (isPurePolicyAdvisory) {
-      score = Math.min(rawScore, 40)
+      score = Math.min(calibratedScore, 40)
       if (!reasons.some((r) => r.includes('policy diagnostic'))) {
         reasons.push(
           'Opportunity is a short-term policy diagnostic and feasibility study (advisory only). Drafting vendor specifications and RFPs under World Bank Conflict of Interest regulations may disqualify the firm from bidding on downstream software implementation.',
         )
       }
     } else if (isBasicScienceGrant) {
-      score = Math.min(rawScore, 35)
+      score = Math.min(calibratedScore, 35)
       if (!reasons.some((r) => r.includes('scientific research grant'))) {
         reasons.push(
           'Investigator-driven federal scientific research grant (not commercial IT procurement). Advanced Scientific Computing Research (ASCR) aligns with high-performance computing, but requires academic/national lab partnership and recognized research Principal Investigator (PI).',
         )
       }
     } else {
-      score = rawScore
+      score = calibratedScore
     }
   }
 

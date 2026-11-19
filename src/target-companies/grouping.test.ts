@@ -105,3 +105,62 @@ test('unidentified source URLs are not merged by title or ID', () => {
 
   assert.equal(groups.length, 2)
 })
+
+test('opportunity groups sorted by fit place relevant matches at the top and less relevant/not_relevant at the last', () => {
+  const groups = groupTargetRecommendations([
+    assessment('WISSEN', 'OPP-GENERIC', 'Generic Maintenance Support', {
+      sourceUrl: 'https://grants.gov/opp-generic',
+      score: 15,
+      outcome: 'not_relevant',
+    }),
+    assessment('WISSEN', 'OPP-FINTECH', 'Banking API & Financial Reconciliation', {
+      sourceUrl: 'https://grants.gov/opp-fintech',
+      score: 95,
+      outcome: 'relevant',
+    }),
+    assessment('WISSEN', 'OPP-PORTAL', 'Regulatory Compliance Portal', {
+      sourceUrl: 'https://grants.gov/opp-portal',
+      score: 75,
+      outcome: 'potentially_relevant',
+    }),
+    assessment('WISSEN', 'OPP-CIVIL', 'Data Center Hardware & Cooling Fit-out', {
+      sourceUrl: 'https://ted.europa.eu/opp-civil',
+      score: 5,
+      outcome: 'not_relevant',
+    }),
+  ])
+
+  function getGroupRelevanceTier(group: (typeof groups)[0]): number {
+    let highestTier = 0
+    for (const item of group.assessments ?? []) {
+      if (item.outcome === 'relevant') {
+        highestTier = Math.max(highestTier, 3)
+      } else if (item.outcome === 'potentially_relevant') {
+        highestTier = Math.max(highestTier, 2)
+      } else if (item.outcome === 'insufficient_evidence') {
+        highestTier = Math.max(highestTier, 1)
+      }
+    }
+    return highestTier
+  }
+
+  const sorted = [...groups].sort((a, b) => {
+    const tierA = getGroupRelevanceTier(a)
+    const tierB = getGroupRelevanceTier(b)
+    if (tierB !== tierA) return tierB - tierA
+
+    const maxA = Math.max(...a.assessments.map((i) => i.score ?? 0), 0)
+    const maxB = Math.max(...b.assessments.map((i) => i.score ?? 0), 0)
+    return maxB - maxA
+  })
+
+  // Relevant and potential leads must be first
+  assert.equal(sorted[0].opportunityId, 'OPP-FINTECH', 'Top item must be the high-confidence relevant lead')
+  assert.equal(sorted[1].opportunityId, 'OPP-PORTAL', 'Second item must be the potentially relevant lead')
+
+  // Not relevant items must sink to the very last
+  assert.equal(sorted[2].opportunityId, 'OPP-GENERIC', 'Third item is lower-tier not_relevant')
+  assert.equal(sorted[3].opportunityId, 'OPP-CIVIL', 'Fourth item is bottom-tier not_relevant')
+  assert.ok(sorted[sorted.length - 1].assessments.every((a) => a.outcome === 'not_relevant'))
+})
+
