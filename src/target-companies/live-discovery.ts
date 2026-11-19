@@ -777,8 +777,8 @@ export async function runTargetCompanyWorldBankDiscovery(
             status: 'Active',
             sectors: [notice.sector],
             requirements: null,
-            applicantTypes: ['commercial', 'for-profit'],
-            country: null,
+            applicantTypes: ['commercial', 'for-profit', 'enterprise', 'Pvt Ltd'],
+            country: notice.country || null,
           })
         }
       }

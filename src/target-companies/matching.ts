@@ -366,6 +366,14 @@ export function evaluateTargetCompanyRelevance(
       mismatchedFields.push('applicantType')
       reasons.push(`Nonprofit entity does not qualify for commercial/for-profit restricted opportunity: ${opportunity.applicantTypes.join(', ')}.`)
       applicantEligibilityStatus = 'ineligible'
+    } else if (requiresForProfitOnly && companyCategory === 'for_profit') {
+      matchedFields.push('applicantType')
+      reasons.push(`For-profit commercial company qualifies for opportunity: ${opportunity.applicantTypes.join(', ')}.`)
+      applicantEligibilityStatus = 'eligible'
+    } else if (companyCategory === 'for_profit' && normalizedApplicantTypes.some((t) => /commercial|forprofit|pvt|enterprise|business/i.test(t))) {
+      matchedFields.push('applicantType')
+      reasons.push(`Commercial entity satisfies applicant criteria: ${opportunity.applicantTypes.join(', ')}.`)
+      applicantEligibilityStatus = 'eligible'
     } else if (company.companyType) {
       mismatchedFields.push('applicantType')
       reasons.push(`Company type ${company.companyType} is not among the stated applicant types: ${opportunity.applicantTypes.join(', ')}.`)
@@ -516,11 +524,38 @@ export function evaluateTargetCompanyRelevance(
         : 'Geography information is missing.',
   }
 
+  const currentYear = new Date().getFullYear()
+  const companyAge = company.foundedYear ? currentYear - company.foundedYear : null
+  const isEstablished = companyAge !== null ? companyAge >= 8 : false
+  const isEarlyStage = companyAge !== null ? companyAge <= 5 : false
+
+  const oppText = `${opportunity.title} ${opportunity.description ?? ''} ${(opportunity.requirements ?? []).join(' ')} ${(opportunity.applicantTypes ?? []).join(' ')}`.toLowerCase()
+  const requiresStartup = /startup|seed fund|ideation|incubatee|early.?stage/i.test(oppText) && !/enterprise|established|vendor|commercial contractor|consortium/i.test(oppText)
+  const isProcurementOrScale = opportunity.opportunityType === 'procurement' || /rfp|procurement|scale.?up|commercial|enterprise|commercialize/i.test(oppText)
+
+  let stageScore: number | null = null
+  let stageReason = 'Company stage is not supplied.'
+  if (companyAge !== null) {
+    if (isEstablished && isProcurementOrScale) {
+      stageScore = 100
+      stageReason = `Established company (${companyAge} yrs, founded ${company.foundedYear}) meets enterprise maturity and track-record requirements.`
+    } else if (isEstablished && requiresStartup) {
+      stageScore = 35
+      stageReason = `Established company (${companyAge} yrs) may exceed early-stage startup eligibility criteria.`
+    } else if (isEarlyStage && requiresStartup) {
+      stageScore = 100
+      stageReason = `Early-stage venture (${companyAge} yrs) aligns with startup seed/acceleration mandate.`
+    } else {
+      stageScore = 80
+      stageReason = `Company age (${companyAge} yrs) evaluated against program scope.`
+    }
+  }
+
   const companyStage: TargetRelevanceFactor = {
-    score: null,
+    score: stageScore,
     weight: 5,
-    evidence: [],
-    reason: 'Company stage is not supplied.',
+    evidence: company.foundedYear ? [`Founded: ${company.foundedYear}`, `Age: ${companyAge ?? 'unknown'} years`] : [],
+    reason: stageReason,
   }
 
   const supportedFactors = [

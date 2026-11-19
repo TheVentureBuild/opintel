@@ -637,6 +637,12 @@ export default function TargetCompanyLiveDiscovery() {
         for (const term of terms) {
           const trimmed = term.trim()
           if (trimmed === '') continue
+          if (activeScope === '100-live') {
+            uniqueGrantsTerms.add(trimmed)
+            uniqueEuTerms.add(trimmed)
+            uniqueTedTerms.add(trimmed)
+            uniqueWorldBankTerms.add(trimmed)
+          }
           if (activeScope === 'rfps' || activeScope === 'all') {
             uniqueTedTerms.add(trimmed)
             uniqueWorldBankTerms.add(trimmed)
@@ -1261,19 +1267,20 @@ export default function TargetCompanyLiveDiscovery() {
                       ? 'SU-GEM-001'
                       : s.source === 'india-grants'
                         ? 'SU-INDIA-GRANTS-001'
-                        : 'SU-WORLDBANK-001',
-            sourceName:
-              s.source === 'grantsgov'
-                ? 'Grants.gov'
-                : s.source === 'eu-sedia'
-                  ? 'EU SEDIA'
-                  : s.source === 'ted'
-                    ? 'TED Procurement'
-                    : s.source === 'gem'
-                      ? 'GeM & CPPP India'
-                      : s.source === 'india-grants'
-                        ? 'MeitY & iDEX Innovation Grants'
-                        : 'World Bank Procurement',
+                        : s.source === 'worldbank'
+                          ? 'SU-WORLDBANK-001'
+                          : s.source === 'sam'
+                            ? 'SU-SAM-001'
+                            : s.source === 'sbir'
+                              ? 'SU-SBIR-001'
+                              : s.source === 'challenge'
+                                ? 'SU-CHALLENGE-001'
+                                : s.source === 'startup-india'
+                                  ? 'SU-STARTUP-INDIA-001'
+                                  : s.source === 'thub'
+                                    ? 'SU-THUB-001'
+                                    : 'SU-ICREATE-001',
+            sourceName: formatFriendlySourceName(s.source),
             adapterType: s.source,
             domain: s.source === 'ted' || s.source === 'gem' || s.source === 'worldbank' ? 'procurement' : 'funding',
             accessState: 'AVAILABLE' as const,
@@ -2187,13 +2194,13 @@ export default function TargetCompanyLiveDiscovery() {
 
                     <div className="sn-opportunity-card__meta">
                       <span>
-                        <strong>Source:</strong> {formatFriendlySourceName(group.source)} ({group.source}) ·{' '}
+                        <strong>Source:</strong> {formatFriendlySourceName(group.source)} ·{' '}
                         {firstAssessment?.sourceUrl ? (
-                          <a href={firstAssessment.sourceUrl} target="_blank" rel="noreferrer">
+                          <a href={firstAssessment.sourceUrl} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
                             {firstAssessment.sourceUrl}
                           </a>
                         ) : (
-                          'Official link available'
+                          <span style={{ color: 'var(--text-muted)' }}>Official link available</span>
                         )}
                       </span>
                       <span>
