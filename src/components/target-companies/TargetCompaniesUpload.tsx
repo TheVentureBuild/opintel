@@ -61,8 +61,16 @@ export default function TargetCompaniesUpload({
       fileTextRef.current = text
       const signature = `${file.name}:${text.length}:${simpleHash(text)}`
       setFileName(file.name)
-      setPreview(parseTargetCompanyInput(text, file.name))
-      setLastImportedSignature((previous) => (previous === signature ? previous : null))
+      const parsed = parseTargetCompanyInput(text, file.name)
+      setPreview(parsed)
+      // Auto-activate valid profiles immediately upon file drop or selection
+      if (parsed.rowCount > 0 && parsed.errors.length === 0) {
+        saveImportedTargetCompanies(parsed)
+        setImported(loadImportedTargetCompanies())
+        setLastImportedSignature(signature)
+      } else {
+        setLastImportedSignature((previous) => (previous === signature ? previous : null))
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The selected file could not be read.'
       setFileName(null)
@@ -215,6 +223,66 @@ export default function TargetCompaniesUpload({
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               Saved locally in this browser
             </span>
+          </div>
+        ) : null}
+
+        {imported && imported.rowCount > 0 ? (
+          <div
+            className="sn-upload-action-shortcuts"
+            style={{
+              marginTop: '16px',
+              padding: '12px 16px',
+              background: 'var(--surface-2, rgba(0, 102, 204, 0.05))',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>🚀</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text)' }}>
+                {imported.rowCount} Company Profile{imported.rowCount === 1 ? '' : 's'} Active:
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={() => {
+                  const el = document.getElementById('company-intelligence-section')
+                  el?.scrollIntoView({ behavior: 'smooth' })
+                }}
+                style={{ fontSize: '12px', padding: '6px 12px', fontWeight: 600 }}
+              >
+                ⚡ Auto-Enrich via Firecrawl
+              </button>
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={() => {
+                  const el = document.getElementById('company-intelligence-section')
+                  el?.scrollIntoView({ behavior: 'smooth' })
+                }}
+                style={{ fontSize: '12px', padding: '6px 12px', fontWeight: 600 }}
+              >
+                ✏️ Edit Company Info &amp; Notes
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() => {
+                  const el = document.getElementById('target-live-discovery-heading')
+                  el?.scrollIntoView({ behavior: 'smooth' })
+                }}
+                style={{ fontSize: '12px', padding: '6px 14px', fontWeight: 600 }}
+              >
+                🔍 Discover Opportunities
+              </button>
+            </div>
           </div>
         ) : null}
       </div>

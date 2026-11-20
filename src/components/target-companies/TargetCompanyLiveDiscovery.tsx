@@ -34,7 +34,10 @@ import { handleGemBridge } from '../../live-source/gem-bridge/handler'
 import { handleIndiaGrantsBridge } from '../../live-source/india-grants-bridge/handler'
 import { handleWorldBankBridge } from '../../live-source/worldbank-bridge/handler'
 import { resolveBridgeUrl } from '../../live-source/bridge-url'
-import { loadImportedTargetCompanies } from '../../target-companies/store'
+import {
+  loadImportedTargetCompanies,
+  subscribeImportedTargetCompanies,
+} from '../../target-companies/store'
 import { csvPreviewToTargetCompanies } from '../../target-companies/profiles'
 import { buildCompanyDiscoveryQueries } from '../../target-companies/discovery-queries'
 import {
@@ -292,7 +295,14 @@ function getGroupRelevanceTier(group: { assessments?: readonly { outcome?: strin
 }
 
 export default function TargetCompanyLiveDiscovery() {
-  const imported = loadImportedTargetCompanies()
+  const [imported, setImported] = useState(() => loadImportedTargetCompanies())
+
+  useEffect(() => {
+    return subscribeImportedTargetCompanies(() => {
+      setImported(loadImportedTargetCompanies())
+    })
+  }, [])
+
   const [enrichmentVersion, setEnrichmentVersion] = useState(0)
   const [isEnriching, setIsEnriching] = useState(false)
   const [enrichmentStatus, setEnrichmentStatus] = useState<string | null>(null)
@@ -302,7 +312,6 @@ export default function TargetCompanyLiveDiscovery() {
 
   const profiles = useMemo(() => {
     return imported ? csvPreviewToTargetCompanies(imported) : []
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imported, enrichmentVersion])
 
   const [results, setResults] = useState<TargetCompanyLiveDiscoveryResult[]>(() => loadCachedResults())
@@ -1402,11 +1411,11 @@ export default function TargetCompanyLiveDiscovery() {
           Ready to Discover Opportunities
         </div>
         <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', margin: '0 auto 16px', maxWidth: '540px', lineHeight: 1.5 }}>
-          Upload a target company CSV above (1–50 companies) to search live Grants.gov, EU SEDIA, TED, and World Bank feeds. Other connectors are disabled until their live data can be verified.
+          Upload a target company CSV or Markdown (.md) file above (1–50 companies) to search live Grants.gov, EU SEDIA, TED, and World Bank feeds. Other connectors are disabled until their live data can be verified.
         </p>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '6px 16px', borderRadius: '999px', border: '1px solid var(--border)' }}>
           <span>💡 Tip:</span>
-          <span>Click <strong>Browse your computer</strong> in the box above to load your company list.</span>
+          <span>Click <strong>Browse your computer</strong> in the box above to load your company list (.csv or .md).</span>
         </div>
       </div>
     )
@@ -1547,6 +1556,7 @@ export default function TargetCompanyLiveDiscovery() {
 
       {profiles.length > 0 ? (
         <section
+          id="company-intelligence-section"
           aria-label="Company research review"
           className="card"
           style={{ padding: '20px', marginBottom: '20px' }}
