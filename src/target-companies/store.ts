@@ -82,11 +82,25 @@ export function loadImportedTargetCompanies(): CsvPreview | null {
 
 export function saveImportedTargetCompanies(preview: CsvPreview): boolean {
   const persistent = browserStorage('localStorage')
-  if (persistent === null) return false
+  const session = browserStorage('sessionStorage')
+  if (persistent === null && session === null) return false
   let serialized: string
   try {
     serialized = JSON.stringify({ ...preview, errors: [] })
-    persistent.setItem(TARGET_COMPANIES_STORAGE_KEY, serialized)
+    if (persistent !== null) {
+      try {
+        persistent.setItem(TARGET_COMPANIES_STORAGE_KEY, serialized)
+      } catch {
+        // If localStorage quota is exceeded, fallback to sessionStorage
+        if (session !== null) {
+          session.setItem(TARGET_COMPANIES_STORAGE_KEY, serialized)
+        } else {
+          return false
+        }
+      }
+    } else if (session !== null) {
+      session.setItem(TARGET_COMPANIES_STORAGE_KEY, serialized)
+    }
   } catch {
     return false
   }
