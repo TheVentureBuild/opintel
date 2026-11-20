@@ -293,3 +293,6 @@ export function parseTargetCompanyCsv(text: string): CsvPreview {
     errors,
   }
 }
+
+export { parseTargetCompanyMarkdown } from './markdown'
+export { parseTargetCompanyInput, isMarkdownFile, isCsvFile } from './input-parser'

@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  parseTargetCompanyCsv,
   TARGET_COMPANY_ROW_MAX,
   TARGET_COMPANY_ROW_MIN,
   type CsvPreview,
 } from '../../target-companies/csv'
+import {
+  parseTargetCompanyInput,
+  isMarkdownFile,
+  isCsvFile,
+} from '../../target-companies/input-parser'
 import {
   clearImportedTargetCompanies,
   loadImportedTargetCompanies,
@@ -14,7 +18,7 @@ import {
 
 export default function TargetCompaniesUpload({
   heading = 'Target Companies',
-  importLabel = 'Upload CSV',
+  importLabel = 'Upload CSV / MD',
 }: {
   heading?: string
   importLabel?: string
@@ -39,13 +43,15 @@ export default function TargetCompaniesUpload({
 
   const handleFile = async (file: File | null) => {
     if (!file) return
-    if (!file.name.toLowerCase().endsWith('.csv')) {
+    const isMd = isMarkdownFile(file.name)
+    const isCsv = isCsvFile(file.name)
+    if (!isCsv && !isMd) {
       setFileName(null)
       setPreview({
         headers: [],
         rows: [],
         rowCount: 0,
-        errors: ['Only .csv files are accepted.'],
+        errors: ['Only .csv and .md files are accepted.'],
       })
       resetInput()
       return
@@ -55,7 +61,7 @@ export default function TargetCompaniesUpload({
       fileTextRef.current = text
       const signature = `${file.name}:${text.length}:${simpleHash(text)}`
       setFileName(file.name)
-      setPreview(parseTargetCompanyCsv(text))
+      setPreview(parseTargetCompanyInput(text, file.name))
       setLastImportedSignature((previous) => (previous === signature ? previous : null))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The selected file could not be read.'
@@ -117,15 +123,15 @@ export default function TargetCompaniesUpload({
             ? `File Selected: ${fileName}`
             : imported
               ? `${imported.rowCount} Target Companies Active`
-              : 'Upload Target Companies CSV'}
+              : 'Upload Target Companies (CSV or Markdown)'}
         </div>
 
         <div className="sn-upload-dropzone__subtitle">
           {fileName
             ? 'Review the table preview below and click Confirm import to activate these profiles.'
             : imported
-              ? 'These companies are actively matched against live grants and procurement tenders. You can drop a new CSV below to replace them.'
-              : `Drag and drop your company list CSV here, or click Browse to choose a file (${TARGET_COMPANY_ROW_MIN}–${TARGET_COMPANY_ROW_MAX} companies).`}
+              ? 'These companies are actively matched against live grants and procurement tenders. You can drop a new CSV or MD file below to replace them.'
+              : `Drag and drop your company list (CSV or Markdown) here, or click Browse to choose a file (${TARGET_COMPANY_ROW_MIN}–${TARGET_COMPANY_ROW_MAX} companies).`}
         </div>
 
         <div className="sn-upload-dropzone__actions target-companies__toolbar">
@@ -136,7 +142,7 @@ export default function TargetCompaniesUpload({
               ref={inputRef}
               id="target-companies-csv"
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.md,text/markdown,.markdown"
               className="visually-hidden"
               onChange={(event) => {
                 void handleFile(event.target.files?.[0] ?? null)
@@ -217,12 +223,12 @@ export default function TargetCompaniesUpload({
         {preview ? (
           <p className="target-companies__status" role="status">
             {hasErrors
-              ? 'CSV validation found errors. Existing imported companies are unchanged.'
-              : `CSV validated: ${preview.rowCount} company record${preview.rowCount === 1 ? '' : 's'} ready to import.`}
+              ? `${isMarkdownFile(fileName) ? 'Markdown' : 'CSV'} validation found errors. Existing imported companies are unchanged.`
+              : `${isMarkdownFile(fileName) ? 'Markdown' : 'CSV'} validated: ${preview.rowCount} company record${preview.rowCount === 1 ? '' : 's'} ready to import.`}
           </p>
         ) : (
           <p className="target-companies__status" role="status">
-            No CSV selected. Existing imported companies are preserved.
+            No file selected. Existing imported companies are preserved.
           </p>
         )}
 
@@ -242,14 +248,14 @@ export default function TargetCompaniesUpload({
 
       {preview && preview.errors.length > 0 ? (
         <div className="target-companies__errors" role="alert" aria-live="assertive">
-          <p className="empty__headline">CSV validation failed</p>
+          <p className="empty__headline">{isMarkdownFile(fileName) ? 'Markdown' : 'CSV'} validation failed</p>
           <ul>
             {preview.errors.map((message, index) => (
               <li key={index}>{message}</li>
             ))}
           </ul>
           <p className="empty__body">
-            Expected {TARGET_COMPANY_ROW_MIN}–{TARGET_COMPANY_ROW_MAX} company records per CSV. Existing
+            Expected {TARGET_COMPANY_ROW_MIN}–${TARGET_COMPANY_ROW_MAX} company records. Existing
             imported records are left unchanged.
           </p>
         </div>
@@ -258,7 +264,7 @@ export default function TargetCompaniesUpload({
       {canShowTable ? (
         <div className="tablewrap">
           <table className="table">
-            <caption className="visually-hidden">Companies from the selected CSV</caption>
+            <caption className="visually-hidden">Companies from the selected file</caption>
             <thead>
               <tr>
                 <th scope="col">Source row</th>
