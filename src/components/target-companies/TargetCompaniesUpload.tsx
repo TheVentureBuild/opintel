@@ -255,7 +255,7 @@ export default function TargetCompaniesUpload({
             ))}
           </ul>
           <p className="empty__body">
-            Expected {TARGET_COMPANY_ROW_MIN}–${TARGET_COMPANY_ROW_MAX} company records. Existing
+            Expected {TARGET_COMPANY_ROW_MIN}–{TARGET_COMPANY_ROW_MAX} company records. Existing
             imported records are left unchanged.
           </p>
         </div>

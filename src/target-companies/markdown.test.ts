@@ -203,3 +203,87 @@ test('parseTargetCompanyInput routes .csv and .md files correctly', () => {
   assert.equal(mdParsed.rowCount, 1)
   assert.equal(mdParsed.rows[0][0], 'Beta Corp')
 })
+
+test('parseTargetCompanyMarkdown handles markdown tables without outer pipes', () => {
+  const md = `
+Company Name | Country | Sector | Website
+--- | --- | --- | ---
+Wissen Tech | India | Fintech | https://www.wissen.com
+Chiprama | United States | Semiconductor | https://chiprama.com
+`
+  const preview = parseTargetCompanyMarkdown(md)
+  assert.equal(preview.errors.length, 0)
+  assert.equal(preview.rowCount, 2)
+  assert.equal(preview.rows[0][0], 'Wissen Tech')
+  assert.equal(preview.rows[0][1], 'India')
+  assert.equal(preview.rows[0][2], 'Fintech')
+  assert.equal(preview.rows[0][3], 'https://www.wissen.com')
+})
+
+test('parseTargetCompanyMarkdown handles table with "Company" column header', () => {
+  const md = `
+| Company | HQ Location | Industry | URL |
+| :--- | :--- | :--- | :--- |
+| Wissen Tech | Bangalore, India | Financial Software | https://www.wissen.com |
+`
+  const preview = parseTargetCompanyMarkdown(md)
+  assert.equal(preview.errors.length, 0)
+  assert.equal(preview.rowCount, 1)
+  assert.equal(preview.rows[0][0], 'Wissen Tech')
+  assert.equal(preview.rows[0][1], 'Bangalore, India')
+  assert.equal(preview.rows[0][2], 'Financial Software')
+  assert.equal(preview.rows[0][3], 'https://www.wissen.com')
+})
+
+test('parseTargetCompanyMarkdown handles unheaded bold key-value lines', () => {
+  const md = `
+**Company Name:** Wissen Tech
+**HQ:** Bangalore, India
+**Sector:** Banking & Financial Technology
+**Website:** https://www.wissen.com
+**Capabilities:** Banking APIs, loan reconciliation
+**Description:** High-throughput enterprise technology provider
+`
+  const preview = parseTargetCompanyMarkdown(md)
+  assert.equal(preview.errors.length, 0)
+  assert.equal(preview.rowCount, 1)
+  assert.equal(preview.rows[0][0], 'Wissen Tech')
+  assert.equal(preview.rows[0][1], 'Bangalore, India')
+  assert.equal(preview.rows[0][2], 'Banking & Financial Technology')
+  assert.equal(preview.rows[0][3], 'https://www.wissen.com')
+  assert.ok(preview.rows[0][4].includes('Banking APIs'))
+})
+
+test('parseTargetCompanyMarkdown handles unheaded plain key-value lines', () => {
+  const md = `
+Company: Wissen Tech
+Location: Bangalore, India
+Sector: Fintech
+Website: https://www.wissen.com
+Capabilities: Banking APIs, financial reconciliation
+`
+  const preview = parseTargetCompanyMarkdown(md)
+  assert.equal(preview.errors.length, 0)
+  assert.equal(preview.rowCount, 1)
+  assert.equal(preview.rows[0][0], 'Wissen Tech')
+  assert.equal(preview.rows[0][1], 'Bangalore, India')
+  assert.equal(preview.rows[0][2], 'Fintech')
+  assert.equal(preview.rows[0][3], 'https://www.wissen.com')
+})
+
+test('parseTargetCompanyMarkdown handles freeform company notes', () => {
+  const md = `
+# Wissen Tech
+Wissen Technology is a specialized enterprise solutions and consulting company.
+Headquarters: Bangalore, India
+Website: https://www.wissen.com
+Sector: Financial Technology
+`
+  const preview = parseTargetCompanyMarkdown(md)
+  assert.equal(preview.errors.length, 0)
+  assert.equal(preview.rowCount, 1)
+  assert.equal(preview.rows[0][0], 'Wissen Tech')
+  assert.ok(preview.rows[0][1].includes('Bangalore'))
+  assert.equal(preview.rows[0][3], 'https://www.wissen.com')
+})
+

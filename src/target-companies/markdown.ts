@@ -2,10 +2,12 @@
  * Dependency-free Markdown parser and extractor for target company profiles.
  *
  * Accepts .md files containing:
- * 1. Markdown tables (multi-column company lists)
+ * 1. Markdown tables (multi-column company lists, with or without outer pipes)
  * 2. Executive Key-Value tables (2-column Attribute | Details tables, such as TVB Dossiers)
  * 3. YAML frontmatter profiles (Obsidian / Vault COMP-*.md format)
  * 4. Sectional / Heading & bullet-point company dossiers (# Company Name with key-value bullets)
+ * 5. Plain key-value lines (**Company Name:** ..., Website: ...) without headings
+ * 6. Freeform company briefs & single-company intelligence dossiers
  *
  * Emits a validated CsvPreview compatible with the target-companies data layer
  * and matching engine.
@@ -70,6 +72,9 @@ export function stripMarkdownFormatting(raw: string): string {
   text = text.replace(/(?:^|,\s*)\s*[•\-\*\+]\s+/g, (match) => (match.includes(',') ? ', ' : ''))
   text = text.replace(/^[•\-\*\+]\s+/, '')
 
+  // Clean residual unclosed asterisks, underscores, or backticks at string boundaries
+  text = text.replace(/^[*_`~]+|[*_`~]+$/g, '').trim()
+
   // Clean double quotes if wrapped
   text = text.replace(/^"|"$/g, '').replace(/^'|'$/g, '')
 
@@ -100,7 +105,7 @@ function parseYamlFrontmatter(text: string): { data: Record<string, string | str
   const trimmed = text.replace(/^\uFEFF/, '').trim()
   if (!trimmed.startsWith('---')) return null
 
-  const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  const match = trimmed.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)([\s\S]*)$/)
   if (!match) return null
 
   const yamlContent = match[1]
@@ -182,7 +187,6 @@ function companyFromFrontmatter(
     if (overviewMatch?.[1]) {
       description = stripMarkdownFormatting(overviewMatch[1])
     } else {
-      // First clean paragraph
       const paras = body.split(/\r?\n\r?\n/).map(stripMarkdownFormatting).filter((p) => p.length > 20 && !p.startsWith('#'))
       if (paras[0]) description = paras[0]
     }
@@ -199,7 +203,7 @@ function companyFromFrontmatter(
 }
 
 /**
- * Detects and parses all markdown tables in a document.
+ * Detects and parses all markdown tables in a document (with or without outer pipes).
  */
 interface ParsedMarkdownTable {
   headers: string[]
@@ -215,16 +219,18 @@ function parseMarkdownTables(text: string): ParsedMarkdownTable[] {
 
   const isTableRow = (line: string): boolean => {
     const trimmed = line.trim()
-    return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2
+    if (!trimmed.includes('|')) return false
+    const cells = splitCells(line)
+    return cells.length >= 2
   }
 
   const isSeparatorRow = (cells: string[]): boolean => {
-    return cells.every((c) => /^:?-+:?$/.test(c.trim()))
+    if (cells.length < 2) return false
+    return cells.every((c) => /^:?-{1,}:?$/.test(c.trim()))
   }
 
   const splitCells = (line: string): string[] => {
     const trimmed = line.trim()
-    // Remove outer pipes
     const inner = trimmed.replace(/^\|/, '').replace(/\|$/, '')
     return inner.split('|').map((c) => c.trim())
   }
@@ -234,14 +240,14 @@ function parseMarkdownTables(text: string): ParsedMarkdownTable[] {
     if (isTableRow(line)) {
       const cells = splitCells(line)
       if (!inTable) {
-        // Look ahead for separator
+        // Look ahead for separator row
         if (i + 1 < lines.length && isTableRow(lines[i + 1])) {
           const nextCells = splitCells(lines[i + 1])
           if (isSeparatorRow(nextCells)) {
             inTable = true
             currentHeaders = cells
             currentRows = []
-            i++ // skip separator row
+            i++ // skip separator
             continue
           }
         }
@@ -283,12 +289,11 @@ function extractFromExecutiveDossierTable(
   const h1 = table.headers[1].toLowerCase()
   const isAttrTable =
     (h0.includes('attribute') || h0.includes('field') || h0.includes('property') || h0.includes('key')) &&
-    (h1.includes('detail') || h1.includes('value') || h1.includes('info'))
+    (h1.includes('detail') || h1.includes('value') || h1.includes('info') || h1.includes('company'))
 
-  // Also check if first column values look like attributes
   const firstColKeys = table.rows.map((r) => stripMarkdownFormatting(r[0] ?? '').toLowerCase())
   const hasKeyIndicators = firstColKeys.some((k) =>
-    k.includes('company') || k.includes('name') || k.includes('jurisdiction') || k.includes('sector') || k.includes('website'),
+    k.includes('company') || k.includes('name') || k.includes('jurisdiction') || k.includes('sector') || k.includes('website') || k.includes('entity'),
   )
 
   if (!isAttrTable && !hasKeyIndicators) return null
@@ -310,34 +315,52 @@ function extractFromExecutiveDossierTable(
     return ''
   }
 
-  let rawName = findVal(/company.*name|^name$|entity.*name|client/i)
+  let rawName = findVal(/company.*name|^name$|entity.*name|client|target/i)
   let cleanName = stripMarkdownFormatting(rawName)
 
   // If company name not in table, check document title heading
   if (!cleanName) {
-    const titleMatch = fullText.match(/^#\s*([^—–\r\n]+?)(?:\s*[—–-]\s*Opportunity Intelligence Dossier|\r?\n|$)/im)
+    const titleMatch = fullText.match(/^#{1,3}\s*([^—–\r\n]+?)(?:\s*[—–-]\s*Opportunity Intelligence Dossier|\r?\n|$)/im)
     if (titleMatch?.[1]) {
-      cleanName = stripMarkdownFormatting(titleMatch[1])
+      const candidate = stripMarkdownFormatting(titleMatch[1])
+      if (!/^(target|company|companies|portfolio|overview|lead)/i.test(candidate)) {
+        cleanName = candidate
+      }
     }
   }
 
   if (!cleanName) return null
 
-  const country = stripMarkdownFormatting(findVal(/jurisdiction|country|location|hq|region/i))
-  const sector = stripMarkdownFormatting(findVal(/sector|industry|domain/i))
-  const website = extractUrlFromMarkdown(findVal(/website|url|portal|domain/i))
+  const country = stripMarkdownFormatting(findVal(/jurisdiction|country|location|hq|region|geography/i))
+  const sector = stripMarkdownFormatting(findVal(/sector|industry|domain|vertical/i))
+  const website = extractUrlFromMarkdown(findVal(/website|url|portal|domain|link/i))
 
-  // Verified capabilities: formatted with bullet points or breaks
-  const rawCaps = findVal(/capabilities|competenc|tags|focus|services/i)
-  const capabilities = rawCaps
-    .split(/<br\s*\/?>|[\r\n•]+/)
-    .map(stripMarkdownFormatting)
-    .filter(Boolean)
-    .join(', ')
+  // Verified capabilities: formatted with bullet points, breaks, or commas
+  let capabilities = ''
+  const rawCaps = findVal(/capabilities|competenc|tags|focus|services|products/i)
+  if (rawCaps) {
+    capabilities = rawCaps
+      .split(/<br\s*\/?>|[\r\n•]+/)
+      .map(stripMarkdownFormatting)
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  // Also scan for capabilities in ### Core Capabilities & Verified Services section
+  if (!capabilities) {
+    const capsSectionMatch = fullText.match(/###\s*(?:Core\s*)?Capabilities[^\r\n]*\r?\n([\s\S]*?)(?=\r?\n###?|---|$)/i)
+    if (capsSectionMatch?.[1]) {
+      capabilities = capsSectionMatch[1]
+        .split(/\r?\n/)
+        .map((l) => stripMarkdownFormatting(l.replace(/^[•\-\*\+]\s*/, '')))
+        .filter((l) => l.length > 2)
+        .join(', ')
+    }
+  }
 
   // Description from text following the table
   let description = ''
-  const descMatch = fullText.match(/###?\s*(?:Company\s*)?Description\s*\r?\n([\s\S]*?)(?=\r?\n##|$)/i)
+  const descMatch = fullText.match(/###?\s*(?:Published\s*Service\s*Scope\s*&?\s*Profile\s*Description|Company\s*Description|Description|Overview)\s*\r?\n([\s\S]*?)(?=\r?\n##|---|(?:\r?\n\r?\n\r?\n)|$)/i)
   if (descMatch?.[1]) {
     description = stripMarkdownFormatting(descMatch[1])
   }
@@ -359,14 +382,29 @@ function extractFromMultiColumnTable(table: ParsedMarkdownTable): ExtractedTarge
   if (table.headers.length < 2) return []
 
   const cleanHeaders = table.headers.map((h) => stripMarkdownFormatting(h).toLowerCase())
-  const nameIndex = cleanHeaders.findIndex((h) => /company.*name|^name$|legal name|client/i.test(h))
+
+  // Broad name regex matching 'Company', 'Company Name', 'Name', 'Organization', 'Entity', 'Business', 'Firm', 'Client', 'Target'
+  const nameIndex = cleanHeaders.findIndex((h) =>
+    /^(?:company|org|organization|entity|business|firm|vendor|client|target)(?:\s*(?:name)?)?$|^name$/i.test(h) ||
+    /company.*name|legal.*name/i.test(h),
+  )
   if (nameIndex < 0) return []
 
-  const countryIndex = cleanHeaders.findIndex((h) => /country|location|hq|region|geography|jurisdiction/i.test(h))
-  const sectorIndex = cleanHeaders.findIndex((h) => /sector|industry|domain|vertical/i.test(h))
-  const urlIndex = cleanHeaders.findIndex((h) => /website|url|domain/i.test(h))
-  const capsIndex = cleanHeaders.findIndex((h) => /capabilities|tags|keywords|focus|competenc/i.test(h))
-  const descIndex = cleanHeaders.findIndex((h) => /description|overview|profile|summary|notes/i.test(h))
+  const countryIndex = cleanHeaders.findIndex((h) =>
+    /country|location|hq|region|geography|jurisdiction|address|city|state/i.test(h),
+  )
+  const sectorIndex = cleanHeaders.findIndex((h) =>
+    /sector|industry|domain|vertical|category|market/i.test(h),
+  )
+  const urlIndex = cleanHeaders.findIndex((h) =>
+    /website|url|domain|link|site|web|portal/i.test(h),
+  )
+  const capsIndex = cleanHeaders.findIndex((h) =>
+    /capabilities|tags|keywords|focus|competenc|services|products|solutions|skills|technolog/i.test(h),
+  )
+  const descIndex = cleanHeaders.findIndex((h) =>
+    /description|overview|profile|summary|notes|about|details|scope/i.test(h),
+  )
 
   const companies: ExtractedTargetCompany[] = []
 
@@ -395,37 +433,39 @@ function extractFromMultiColumnTable(table: ParsedMarkdownTable): ExtractedTarge
 }
 
 /**
- * Extracts company profiles from section headings and bullet points.
- * e.g.:
- * # Company Name
- * - **Location**: India
- * - **Sector**: Fintech
- * - **Website**: https://...
+ * Extracts company profiles from headings, bullet points, and key-value lines.
  */
-function extractFromHeadingsAndBullets(text: string): ExtractedTargetCompany[] {
-  // Split on H1 or H2 headings
-  const sections = text.split(/(?=^#{1,2}\s+[^\r\n]+)/m).filter((s) => s.trim().startsWith('#'))
-  if (sections.length === 0) return []
+function extractFromHeadingsAndKeyValues(text: string): ExtractedTargetCompany[] {
+  // Check if text has sections marked by H1, H2, H3 or horizontal rules
+  const hasHeadings = /^#{1,3}\s+[^\r\n]+/m.test(text)
+  const rawSections = hasHeadings
+    ? text.split(/(?=^#{1,3}\s+[^\r\n]+)/m).filter((s) => s.trim().length > 0)
+    : text.split(/(?=^---\s*$(?!\r?\n---))/m).filter((s) => s.trim().length > 0)
 
+  const sections = rawSections.length > 0 ? rawSections : [text]
   const companies: ExtractedTargetCompany[] = []
 
   for (const section of sections) {
     const lines = section.split(/\r?\n/)
-    const headingLine = lines[0] ?? ''
-    const headingTitle = headingLine.replace(/^#{1,2}\s+/, '').trim()
+    const firstLine = lines[0]?.trim() ?? ''
+    let sectionHeading = ''
+    if (/^#{1,3}\s+/.test(firstLine)) {
+      sectionHeading = firstLine.replace(/^#{1,3}\s+/, '').trim()
+    }
 
     // Skip generic document title headings
-    if (/^(target\s+(?:companies|portfolio|list)|company\s+profiles|overview|introduction|table\s+of\s+contents|leads|summary|portfolio)/i.test(headingTitle)) {
+    if (/^(target\s+(?:companies|portfolio|list)|company\s+profiles|overview|introduction|table\s+of\s+contents|leads|summary|portfolio)/i.test(sectionHeading)) {
       continue
     }
 
-    const cleanName = stripMarkdownFormatting(headingTitle)
-      .replace(/^DEMO\s*[—–-]\s*/i, '')
-      .replace(/^Company\s*:\s*/i, '')
-      .replace(/\s*[—–-]\s*Opportunity Intelligence Dossier.*$/i, '')
-      .trim()
-
-    if (!cleanName) continue
+    let detectedName = ''
+    if (sectionHeading) {
+      detectedName = stripMarkdownFormatting(sectionHeading)
+        .replace(/^DEMO\s*[—–-]\s*/i, '')
+        .replace(/^Company\s*:\s*/i, '')
+        .replace(/\s*[—–-]\s*Opportunity Intelligence Dossier.*$/i, '')
+        .trim()
+    }
 
     let country = ''
     let sector = ''
@@ -433,42 +473,47 @@ function extractFromHeadingsAndBullets(text: string): ExtractedTargetCompany[] {
     let capabilities = ''
     const descParts: string[] = []
 
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = (sectionHeading ? 1 : 0); i < lines.length; i++) {
       const line = lines[i].trim()
       if (!line) continue
 
-      const bulletMatch = line.match(/^[•\-\*\+]\s*(?:\*\*([^*:]+)\*\*|([^*:]+))\s*:\s*(.*)$/)
-      if (bulletMatch) {
-        const key = (bulletMatch[1] || bulletMatch[2] || '').trim().toLowerCase()
-        const val = (bulletMatch[3] || '').trim()
+      // Look for key-value by colon delimiter (e.g. **Company Name:** ..., - Location: ..., HQ: ...)
+      const rawLine = line.replace(/^[•\-\*\+]\s*/, '').trim()
+      const colonIdx = rawLine.indexOf(':')
+      if (colonIdx > 0 && colonIdx < 50) {
+        const rawKey = rawLine.slice(0, colonIdx)
+        const rawVal = rawLine.slice(colonIdx + 1)
+        const key = rawKey.replace(/[*_~`#]/g, '').trim().toLowerCase()
+        const cleanRawVal = rawVal.replace(/^[*_~`\s]+|[*_~`\s]+$/g, '').trim()
+        const val = stripMarkdownFormatting(cleanRawVal)
 
-        if (/country|location|hq|region|geography|jurisdiction/i.test(key)) {
-          country = stripMarkdownFormatting(val)
-        } else if (/sector|industry|domain|vertical/i.test(key)) {
-          sector = stripMarkdownFormatting(val)
-        } else if (/website|url|domain/i.test(key)) {
+        if (/^(?:company\s*name|company|client|organization|entity|name)$/i.test(key)) {
+          detectedName = val
+          continue
+        } else if (/country|location|hq|headquarter|region|geography|jurisdiction|address|city|state/i.test(key)) {
+          country = val
+          continue
+        } else if (/sector|industry|domain|vertical|category|market/i.test(key)) {
+          sector = val
+          continue
+        } else if (/website|url|domain|portal|link|site|web/i.test(key)) {
           website = extractUrlFromMarkdown(val)
-        } else if (/capabilities|tags|keywords|focus|competenc|services/i.test(key)) {
-          capabilities = stripMarkdownFormatting(val)
-        } else if (/description|overview|profile|summary|notes/i.test(key)) {
-          descParts.push(stripMarkdownFormatting(val))
+          continue
+        } else if (/capabilities|tags|keywords|focus|competenc|services|products|skills/i.test(key)) {
+          capabilities = val
+          continue
+        } else if (/description|overview|profile|summary|notes|about/i.test(key)) {
+          descParts.push(val)
+          continue
         }
-        continue
       }
 
-      // Check plain key-value lines without bullets (e.g. Website: https://...)
-      const kvMatch = line.match(/^([a-zA-Z\s]{3,25})\s*:\s*(.*)$/)
-      if (kvMatch && !line.startsWith('#')) {
-        const key = kvMatch[1].trim().toLowerCase()
-        const val = kvMatch[2].trim()
-        if (/^website|url$/i.test(key)) {
-          website = extractUrlFromMarkdown(val)
-          continue
-        } else if (/^country|location|hq$/i.test(key)) {
-          country = stripMarkdownFormatting(val)
-          continue
-        } else if (/^sector|industry$/i.test(key)) {
-          sector = stripMarkdownFormatting(val)
+      // Check sub-bullet capability lines
+      if (/^[•\-\*\+]\s+/.test(line)) {
+        const bulletText = stripMarkdownFormatting(line)
+        if (bulletText.length > 3 && bulletText.length < 100) {
+          if (!capabilities) capabilities = bulletText
+          else capabilities += `, ${bulletText}`
           continue
         }
       }
@@ -480,9 +525,9 @@ function extractFromHeadingsAndBullets(text: string): ExtractedTargetCompany[] {
     }
 
     const hasAttributes = Boolean(country || sector || website || capabilities)
-    if (cleanName && (hasAttributes || sections.length === 1)) {
+    if (detectedName && (hasAttributes || sections.length === 1)) {
       companies.push({
-        name: cleanName,
+        name: detectedName,
         country,
         sector,
         website,
@@ -493,6 +538,61 @@ function extractFromHeadingsAndBullets(text: string): ExtractedTargetCompany[] {
   }
 
   return companies
+}
+
+/**
+ * Freeform single-company fallback for plain text or narrative markdown notes.
+ */
+function fallbackSingleCompanyDocument(text: string): ExtractedTargetCompany | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+
+  // 1. Look for a heading or first line containing the company name
+  const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  if (lines.length === 0) return null
+
+  let name = ''
+  const firstLine = lines[0]
+  if (/^#{1,3}\s+/.test(firstLine)) {
+    name = stripMarkdownFormatting(firstLine.replace(/^#{1,3}\s+/, ''))
+      .replace(/\s*[—–-]\s*Opportunity Intelligence Dossier.*$/i, '')
+      .replace(/^DEMO\s*[—–-]\s*/i, '')
+      .trim()
+  } else if (!firstLine.includes(':') && firstLine.length < 60) {
+    name = stripMarkdownFormatting(firstLine)
+  }
+
+  // 2. Scan for website URL
+  const website = extractUrlFromMarkdown(trimmed)
+
+  // 3. Scan for common locations
+  let country = ''
+  const locationMatch = trimmed.match(/(?:headquarters|hq|location|based in|offices in|operating in)\s*[:—–-]?\s*([A-Za-z\s,]+?)(?:\.|\r?\n|$)/i)
+  if (locationMatch?.[1]) {
+    country = stripMarkdownFormatting(locationMatch[1]).slice(0, 80)
+  }
+
+  // 4. Scan for sector
+  let sector = ''
+  const sectorMatch = trimmed.match(/(?:sector|industry|domain|vertical|focus)\s*[:—–-]?\s*([A-Za-z\s,&]+?)(?:\.|\r?\n|$)/i)
+  if (sectorMatch?.[1]) {
+    sector = stripMarkdownFormatting(sectorMatch[1]).slice(0, 80)
+  }
+
+  // If we have at least a name and some data
+  if (name && (website || country || sector || lines.length > 1)) {
+    const paras = trimmed.split(/\r?\n\r?\n/).map(stripMarkdownFormatting).filter((p) => p.length > 20 && !p.startsWith('#'))
+    return {
+      name,
+      country,
+      sector,
+      website,
+      capabilities: '',
+      description: paras.slice(0, 2).join(' '),
+    }
+  }
+
+  return null
 }
 
 /**
@@ -540,12 +640,20 @@ export function parseTargetCompanyMarkdown(text: string): CsvPreview {
     }
   }
 
-  // 3. Try Sectional Headings & Bullets if still empty
+  // 3. Try Sectional Headings & Key-Value bullets
   if (extracted.length === 0) {
-    extracted = extractFromHeadingsAndBullets(text)
+    extracted = extractFromHeadingsAndKeyValues(text)
   }
 
-  // 4. Validate findings
+  // 4. Try Freeform single-company document fallback
+  if (extracted.length === 0) {
+    const fallback = fallbackSingleCompanyDocument(text)
+    if (fallback) {
+      extracted.push(fallback)
+    }
+  }
+
+  // 5. Validate findings
   if (extracted.length === 0) {
     errors.push(
       'No target company profiles could be extracted from the Markdown file. Ensure the file contains company details in a Markdown table, YAML frontmatter, or structured headings (# Company Name with - **Location**: ... bullets).',
