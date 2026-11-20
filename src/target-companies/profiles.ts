@@ -23,7 +23,10 @@ export function csvPreviewToTargetCompanies(preview: CsvPreview): TargetCompanyM
 
   return preview.rows.map((row, index) => {
     const rawName = nameIndex >= 0 ? (row[nameIndex] ?? '').trim() : ''
-    const cleanName = rawName.replace(/^companies\//i, '').trim()
+    const cleanName = rawName
+      .replace(/^\[\[(.*)\]\]$/, '$1')
+      .replace(/^companies\//i, '')
+      .trim()
     const suppliedName = cleanName || `Unnamed target company (row ${index + 2})`
     let country = countryIndex >= 0 ? (row[countryIndex] ?? '').trim() : ''
     const sector = sectorIndex >= 0 ? (row[sectorIndex] ?? '').trim() : ''
@@ -36,6 +39,7 @@ export function csvPreviewToTargetCompanies(preview: CsvPreview): TargetCompanyM
           .split(/[\r\n,;]+/)
           .map((t) => t.trim())
           .filter(Boolean)
+          .map((t) => t.replace(/^#+/, '').trim())
           .map((t) => t.replace(/^(sector|capability|market|industry|tech)\//i, '').replace(/[-_]+/g, ' ').trim())
           .filter((t) => t.length > 0 && !t.startsWith('profile/') && !t.startsWith('relationship/'))
       : []

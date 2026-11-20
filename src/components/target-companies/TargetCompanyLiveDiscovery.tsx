@@ -38,6 +38,7 @@ import {
   loadImportedTargetCompanies,
   subscribeImportedTargetCompanies,
 } from '../../target-companies/store'
+import type { CsvPreview } from '../../target-companies/csv'
 import { csvPreviewToTargetCompanies } from '../../target-companies/profiles'
 import { buildCompanyDiscoveryQueries } from '../../target-companies/discovery-queries'
 import {
@@ -294,14 +295,24 @@ function getGroupRelevanceTier(group: { assessments?: readonly { outcome?: strin
   return highestTier
 }
 
-export default function TargetCompanyLiveDiscovery() {
-  const [imported, setImported] = useState(() => loadImportedTargetCompanies())
+export interface TargetCompanyLiveDiscoveryProps {
+  activePreview?: CsvPreview | null
+  onActivePreviewChange?: (preview: CsvPreview | null) => void
+}
+
+export default function TargetCompanyLiveDiscovery({
+  activePreview,
+  onActivePreviewChange: _onActivePreviewChange,
+}: TargetCompanyLiveDiscoveryProps = {}) {
+  const [storedImported, setStoredImported] = useState(() => loadImportedTargetCompanies())
 
   useEffect(() => {
     return subscribeImportedTargetCompanies(() => {
-      setImported(loadImportedTargetCompanies())
+      setStoredImported(loadImportedTargetCompanies())
     })
   }, [])
+
+  const imported = activePreview !== undefined ? activePreview : storedImported
 
   const [enrichmentVersion, setEnrichmentVersion] = useState(0)
   const [isEnriching, setIsEnriching] = useState(false)

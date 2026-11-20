@@ -13,6 +13,9 @@ test('stripMarkdownFormatting strips bold, italics, links, and HTML breaks', () 
   assert.equal(stripMarkdownFormatting('*Fintech*'), 'Fintech')
   assert.equal(stripMarkdownFormatting('[https://wissen.com](https://wissen.com)'), 'https://wissen.com')
   assert.equal(stripMarkdownFormatting('[Wissen Official](https://wissen.com)'), 'Wissen Official')
+  assert.equal(stripMarkdownFormatting('[[Threatworx]]'), 'Threatworx')
+  assert.equal(stripMarkdownFormatting('[[Threatworx|Threatworx Inc]]'), 'Threatworx Inc')
+  assert.equal(stripMarkdownFormatting('[[companies/Threatworx|Threatworx]]'), 'Threatworx')
   assert.equal(stripMarkdownFormatting('• item1<br/>• item2'), 'item1, item2')
   assert.equal(stripMarkdownFormatting('`code-span`'), 'code-span')
 })
@@ -286,4 +289,48 @@ Sector: Financial Technology
   assert.ok(preview.rows[0][1].includes('Bangalore'))
   assert.equal(preview.rows[0][3], 'https://www.wissen.com')
 })
+
+test('parseTargetCompanyMarkdown parses Threatworx.md with wiki-links, #tags, and meeting notes without creating extra rows', () => {
+  const md = `
+# [[Threatworx]]
+Location / Country: Bay Area, US
+Website / URL: https://www.linkedin.com/company/threatworx/
+Capabilities / Tags: #profile/enriched, #relationship/portfolio, #sector/cybersecurity, #market/enterprise, #market/mid-market, #market/healthcare, #market/financial-services, fundraising
+Description / Profile: relationship_status: portfolio legalagreementvalid: Y revenue_share: Y equity_share: NA platform_fee: NA consulting_fee: NA otherengagementstructure: NA agreement_components: []
+
+## 2026-10-14 — SI Centric Deck Review (Harshal + Ketan)
+- 90-day customer engagement plan agreed:
+- Weeks 1–4: Identify 3 existing ThreatWorx customers for pre-evaluation and joint assessments
+- Weeks 3–6: Define PoC scope
+- Weeks 7–12: Deliver first PoC
+- Ketan → create pricing model for $50K and $200K product offerings
+- Ketan → send revised plan/document with structural changes
+- The group → run shadow AI discovery campaign with free kickstarter offer
+
+Reviewed TVB dashboard platform positioning and ThreatWorx shadow AI discovery capability. Key outcomes: Pricing tiers established: $50K for AI inventory assessment, scaling to $200K–$500K deals.
+`
+  const preview = parseTargetCompanyMarkdown(md)
+  assert.equal(preview.errors.length, 0)
+  assert.equal(preview.rowCount, 1, 'Should extract exactly 1 company (Threatworx) and not treat the meeting note as a second company')
+
+  const [row] = preview.rows
+  assert.equal(row[0], 'Threatworx', 'Should strip obsidian [[...]] brackets')
+  assert.equal(row[1], 'Bay Area, US')
+  assert.equal(row[2], 'cybersecurity', 'Should infer sector from #sector/cybersecurity tag')
+  assert.equal(row[3], 'https://www.linkedin.com/company/threatworx/')
+  assert.ok(row[4].includes('#sector/cybersecurity'))
+  assert.ok(row[5].includes('relationship_status: portfolio'))
+  assert.ok(row[5].includes('customer engagement plan agreed') || row[5].includes('Reviewed TVB dashboard'))
+
+  const profiles = csvPreviewToTargetCompanies(preview)
+  assert.equal(profiles.length, 1)
+  assert.equal(profiles[0].name, 'Threatworx')
+  assert.equal(profiles[0].country, 'Bay Area, US')
+  assert.equal(profiles[0].sector, 'cybersecurity')
+  assert.equal(profiles[0].website, 'https://www.linkedin.com/company/threatworx/')
+  assert.ok(profiles[0].capabilities?.includes('cybersecurity'))
+  assert.ok(profiles[0].capabilities?.includes('enterprise'))
+  assert.ok(!profiles[0].capabilities?.some((c) => c.startsWith('#')), 'Hashtags should be stripped from capabilities')
+})
+
 

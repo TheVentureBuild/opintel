@@ -47,6 +47,14 @@ export function stripMarkdownFormatting(raw: string): string {
   // Replace <br/>, <br>, <br /> with comma or separator
   text = text.replace(/<br\s*\/?>/gi, ', ')
 
+  // Strip Obsidian wiki-links: [[Target|Label]] -> Label, [[Target]] -> Target, [[companies/Target]] -> Target
+  text = text.replace(/\[\[(?:[^\]|]+\|)?([^\]]+)\]\]/g, (_match, inner) => {
+    const cleanInner = (inner || '').trim().replace(/^companies\//i, '')
+    return cleanInner
+  })
+  // Strip residual unclosed double brackets
+  text = text.replace(/\[\[|\]\]/g, '')
+
   // Strip markdown links: [text](url) -> if text is url or empty, use url, else if text is descriptive, keep text
   text = text.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_match, label, url) => {
     const l = (label || '').trim()
@@ -57,13 +65,13 @@ export function stripMarkdownFormatting(raw: string): string {
     return l
   })
 
-  // Strip bold and italics
+  // Strip bold and italics (word boundary aware so snake_case like relationship_status is preserved)
   text = text.replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
   text = text.replace(/\*\*([^*]+)\*\*/g, '$1')
-  text = text.replace(/\*([^*]+)\*/g, '$1')
+  text = text.replace(/(?<=^|\s)\*([^*\s][^*]*[^*\s]|[^*\s])\*(?=\s|$|[.,:;!?])/g, '$1')
   text = text.replace(/___([^_]+)___/g, '$1')
-  text = text.replace(/__([^_]+)__/g, '$1')
-  text = text.replace(/_([^_]+)_/g, '$1')
+  text = text.replace(/(?<=^|\s)__([^_\s][^_]*[^_\s]|[^_\s])__(?=\s|$|[.,:;!?])/g, '$1')
+  text = text.replace(/(?<=^|\s)_([^_\s][^_]*[^_\s]|[^_\s])_(?=\s|$|[.,:;!?])/g, '$1')
 
   // Strip inline code backticks
   text = text.replace(/`([^`]+)`/g, '$1')
@@ -433,6 +441,39 @@ function extractFromMultiColumnTable(table: ParsedMarkdownTable): ExtractedTarge
 }
 
 /**
+ * Detects if a heading is an internal meeting, dated log, or non-company section
+ * rather than a new target company profile.
+ */
+export function isNonCompanyHeading(heading: string): boolean {
+  if (!heading) return true
+  const clean = stripMarkdownFormatting(heading).trim()
+
+  // Date-prefixed headings: e.g. 2026-10-14 — SI Centric Deck Review (Harshal + Ketan)
+  if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/.test(clean)) return true
+  if (/^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,4}/i.test(clean)) return true
+
+  // Meeting notes, deck reviews, calls, discussions, recaps, logs, customer engagement plans
+  if (
+    /\b(meeting|deck\s+review|call\s+notes?|notes?|minutes?|review|discussion|agenda|log|update|status|timeline|engagement\s+plan|q[1-4]|h[1-2]|appendix|references?|sources?|action\s+items?|recap|follow[- ]?up|customer\s+engagement)\b/i.test(
+      clean,
+    )
+  ) {
+    return true
+  }
+
+  // Generic document or company profile section titles
+  if (
+    /^(target\s+(?:companies|portfolio|list)|company\s+profiles?|overview|introduction|table\s+of\s+contents|leads|summary|portfolio|background|capabilities|services|products|team|history|architecture|key\s+outcomes|pricing|traction|customers|competitors)/i.test(
+      clean,
+    )
+  ) {
+    return true
+  }
+
+  return false
+}
+
+/**
  * Extracts company profiles from headings, bullet points, and key-value lines.
  */
 function extractFromHeadingsAndKeyValues(text: string): ExtractedTargetCompany[] {
@@ -453,8 +494,22 @@ function extractFromHeadingsAndKeyValues(text: string): ExtractedTargetCompany[]
       sectionHeading = firstLine.replace(/^#{1,3}\s+/, '').trim()
     }
 
-    // Skip generic document title headings
-    if (/^(target\s+(?:companies|portfolio|list)|company\s+profiles|overview|introduction|table\s+of\s+contents|leads|summary|portfolio)/i.test(sectionHeading)) {
+    // Skip generic document title headings or meeting/log sections
+    if (sectionHeading && isNonCompanyHeading(sectionHeading)) {
+      // If we already have a previous company extracted, attach these meeting notes and log details to it
+      if (companies.length > 0) {
+        const last = companies[companies.length - 1]
+        const extraBullets = lines
+          .slice(1)
+          .map((l) => stripMarkdownFormatting(l.replace(/^[•\-\*\+]\s*/, '').trim()))
+          .filter((l) => l.length > 8)
+          .join(', ')
+        if (extraBullets) {
+          last.description = last.description
+            ? `${last.description}. ${extraBullets}`
+            : extraBullets
+        }
+      }
       continue
     }
 
@@ -524,10 +579,19 @@ function extractFromHeadingsAndKeyValues(text: string): ExtractedTargetCompany[]
       }
     }
 
+    // If sector is empty, try to extract from tags/capabilities
+    if (!sector && capabilities) {
+      const secMatch = capabilities.match(/#?sector\/([a-zA-Z0-9_-]+)/i)
+      if (secMatch?.[1]) {
+        sector = secMatch[1].replace(/[-_]+/g, ' ')
+      }
+    }
+
+    const cleanDetectedName = stripMarkdownFormatting(detectedName).replace(/^companies\//i, '').trim()
     const hasAttributes = Boolean(country || sector || website || capabilities)
-    if (detectedName && (hasAttributes || sections.length === 1)) {
+    if (cleanDetectedName && !isNonCompanyHeading(cleanDetectedName) && (hasAttributes || sections.length === 1)) {
       companies.push({
-        name: detectedName,
+        name: cleanDetectedName,
         country,
         sector,
         website,

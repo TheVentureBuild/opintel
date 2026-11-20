@@ -16,13 +16,19 @@ import {
   subscribeImportedTargetCompanies,
 } from '../../target-companies/store'
 
+export interface TargetCompaniesUploadProps {
+  heading?: string
+  importLabel?: string
+  activePreview?: CsvPreview | null
+  onActivePreviewChange?: (preview: CsvPreview | null) => void
+}
+
 export default function TargetCompaniesUpload({
   heading = 'Target Companies',
   importLabel = 'Upload CSV / MD',
-}: {
-  heading?: string
-  importLabel?: string
-} = {}) {
+  activePreview,
+  onActivePreviewChange,
+}: TargetCompaniesUploadProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [preview, setPreview] = useState<CsvPreview | null>(null)
@@ -36,6 +42,10 @@ export default function TargetCompaniesUpload({
     () => subscribeImportedTargetCompanies(() => setImported(loadImportedTargetCompanies())),
     [],
   )
+
+  const effectiveActive = (preview && preview.errors.length === 0 && preview.rowCount > 0)
+    ? preview
+    : (activePreview !== undefined ? activePreview : imported)
 
   const resetInput = () => {
     if (inputRef.current) inputRef.current.value = ''
@@ -68,6 +78,7 @@ export default function TargetCompaniesUpload({
         saveImportedTargetCompanies(parsed)
         setImported(loadImportedTargetCompanies())
         setLastImportedSignature(signature)
+        onActivePreviewChange?.(parsed)
       } else {
         setLastImportedSignature((previous) => (previous === signature ? previous : null))
       }
@@ -88,6 +99,9 @@ export default function TargetCompaniesUpload({
     setFileName(null)
     setPreview(null)
     resetInput()
+    if (!imported) {
+      onActivePreviewChange?.(null)
+    }
   }
 
   const hasErrors = Boolean(preview && preview.errors.length > 0)
@@ -136,7 +150,9 @@ export default function TargetCompaniesUpload({
 
         <div className="sn-upload-dropzone__subtitle">
           {fileName
-            ? 'Review the table preview below and click Confirm import to activate these profiles.'
+            ? preview && preview.errors.length === 0
+              ? 'Profiles active & ready for Discovery. Review the table preview below or click Discover Opportunities to start.'
+              : 'Review the file validation status below.'
             : imported
               ? 'These companies are actively matched against live grants and procurement tenders. You can drop a new CSV or MD file below to replace them.'
               : `Drag and drop your company list (CSV or Markdown) here, or click Browse to choose a file (${TARGET_COMPANY_ROW_MIN}–${TARGET_COMPANY_ROW_MAX} companies).`}
@@ -172,10 +188,12 @@ export default function TargetCompaniesUpload({
                 setImportError(null)
                 const saved = saveImportedTargetCompanies(preview)
                 if (saved) {
-                  setImported(loadImportedTargetCompanies())
+                  const updated = loadImportedTargetCompanies()
+                  setImported(updated)
                   setLastImportedSignature(signature)
+                  onActivePreviewChange?.(updated ?? preview)
                 } else {
-                  setImportError('The CSV could not be saved in this browser. Your existing imported companies were not changed.')
+                  setImportError('The file could not be saved in this browser. Your existing imported companies were not changed.')
                 }
                 setImporting(false)
               }
@@ -195,12 +213,16 @@ export default function TargetCompaniesUpload({
             onClick={() => {
               if (clearImportedTargetCompanies()) {
                 setImported(null)
+                setPreview(null)
+                setFileName(null)
                 setImportError(null)
+                onActivePreviewChange?.(null)
+                resetInput()
               } else {
                 setImportError('The imported companies could not be removed from this browser.')
               }
             }}
-            disabled={!imported}
+            disabled={!imported && !effectiveActive}
           >
             Remove imported set
           </button>
@@ -226,7 +248,7 @@ export default function TargetCompaniesUpload({
           </div>
         ) : null}
 
-        {imported && imported.rowCount > 0 ? (
+        {effectiveActive && effectiveActive.rowCount > 0 ? (
           <div
             className="sn-upload-action-shortcuts"
             style={{
@@ -245,7 +267,7 @@ export default function TargetCompaniesUpload({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '16px' }}>🚀</span>
               <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text)' }}>
-                {imported.rowCount} Company Profile{imported.rowCount === 1 ? '' : 's'} Active:
+                {effectiveActive.rowCount} Company Profile{effectiveActive.rowCount === 1 ? '' : 's'} Active &amp; Ready:
               </span>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

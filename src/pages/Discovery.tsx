@@ -19,7 +19,11 @@ import { liveGrantsGovDiscoveryStore } from '../live-source/live-grantsgov-disco
 import { liveEuSediaDiscoveryStore } from '../live-source/live-eu-sedia-discovery'
 import { liveUsaSpendingDiscoveryStore } from '../live-source/live-funding-discovery'
 
-import { loadImportedTargetCompanies, subscribeImportedTargetCompanies } from '../target-companies/store'
+import {
+  loadImportedTargetCompanies,
+  saveImportedTargetCompanies,
+  subscribeImportedTargetCompanies,
+} from '../target-companies/store'
 import { csvPreviewToTargetCompanies } from '../target-companies/profiles'
 import { COMPANY_DIRECTORY_NAMES } from '../data/company-directory-names'
 import TargetCompaniesUpload from '../components/target-companies/TargetCompaniesUpload'
@@ -292,11 +296,26 @@ export default function Discovery() {
         </div>
       ) : null}
 
-      {/* CSV Target Companies Upload Area */}
-      <TargetCompaniesUpload heading="Upload your company list" importLabel="Browse your computer" />
+      {/* CSV / Markdown Target Companies Upload Area */}
+      <TargetCompaniesUpload
+        heading="Upload your company list"
+        importLabel="Browse your computer"
+        activePreview={importedPreview}
+        onActivePreviewChange={(preview) => {
+          setImportedPreview(preview)
+          if (preview && preview.rowCount > 0 && preview.errors.length === 0) {
+            saveImportedTargetCompanies(preview)
+          }
+        }}
+      />
 
       {/* Live Discovery & Interactive Opportunity Cards */}
-      <TargetCompanyLiveDiscovery />
+      <TargetCompanyLiveDiscovery
+        activePreview={importedPreview}
+        onActivePreviewChange={(preview) => {
+          setImportedPreview(preview)
+        }}
+      />
 
       {/* Legacy Developer API Action Buttons (only visible in ?demo=1 test harness) */}
       {source.demo ? (
