@@ -1,0 +1,23 @@
+# AWS Amplify Hosting: builds the Nexus version of Opportunity Intelligence in nexus-app/ (branch test).
+# Served on the Nexus domain at /opintel/ through the main site's proxy rules, so the build goes to dist/opintel/.
+# Environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, VITE_SUPABASE_PROJECT_ID)
+# are set per branch in the Amplify console, never in this file.
+version: 1
+applications:
+  - appRoot: nexus-app
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm use 22 || true
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
